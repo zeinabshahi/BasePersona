@@ -1,0 +1,17 @@
+[variables]
+PORT = "3000"
+
+[phases.setup]
+nixPkgs = ["nodejs_20", "python3", "gcc", "gnumake"]
+
+[phases.install]
+cmds = ["npm ci"]
+working_directory = "ui"
+
+[phases.build]
+cmds = ["npm run build"]
+working_directory = "ui"
+
+[start]
+cmd = "npm run start"
+working_directory = "ui"
