@@ -415,8 +415,8 @@ export default function CardPreviewMint({
       <div style={{ display:'grid', gridTemplateColumns:'repeat(3, minmax(0, 1fr))', gap: 10, alignItems:'center' }}>
         <button
           onClick={()=>generateBase({ prompt: defaultPrompt })}
-          disabled={!!busy.gen || !!busy.paying || (GATE && gateRemain!==undefined && toNumberSafe(gateRemain)===0)}
-          style={{ ...btn('linear-gradient(135deg,#7c3aed,#2563eb)'), ...((busy.gen||busy.paying||(GATE && gateRemain!==undefined && toNumberSafe(gateRemain)===0))?btnDisabled:{}) }}
+          disabled={!!busy.gen || !!busy.paying || (!!GATE && gateRemain!==undefined && toNumberSafe(gateRemain)===0)}
+          style={{ ...btn('linear-gradient(135deg,#7c3aed,#2563eb)'), ...((busy.gen||busy.paying||((!!GATE) && gateRemain!==undefined && toNumberSafe(gateRemain)===0))?btnDisabled:{}) }}
           title={GATE ? 'Pay & Generate' : 'Generate'}
         >
           {busy.paying ? 'Paying…' : 'Generate'}
