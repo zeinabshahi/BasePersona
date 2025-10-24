@@ -1,0 +1,42 @@
+[
+  {
+    "inputs": [
+      { "internalType": "string", "name": "name_", "type": "string" },
+      { "internalType": "string", "name": "version_", "type": "string" }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "constructor"
+  },
+  {
+    "inputs": [],
+    "name": "domainSeparator",
+    "outputs": [
+      { "internalType": "bytes32", "name": "", "type": "bytes32" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      { "internalType": "address", "name": "signer", "type": "address" },
+      { "internalType": "address", "name": "to", "type": "address" },
+      { "internalType": "uint256", "name": "periodId", "type": "uint256" },
+      { "internalType": "bytes32", "name": "statsHash", "type": "bytes32" },
+      { "internalType": "bytes32", "name": "traitsHash", "type": "bytes32" },
+      { "internalType": "uint256", "name": "price", "type": "uint256" },
+      { "internalType": "uint256", "name": "deadline", "type": "uint256" },
+      { "internalType": "uint256", "name": "modelVersion", "type": "uint256" },
+      { "internalType": "bytes32", "name": "promptHash", "type": "bytes32" },
+      { "internalType": "bytes32", "name": "quoteId", "type": "bytes32" },
+      { "internalType": "uint256", "name": "quoteAt", "type": "uint256" },
+      { "internalType": "bytes32", "name": "quoteSourceHash", "type": "bytes32" },
+      { "internalType": "bytes", "name": "sig", "type": "bytes" }
+    ],
+    "name": "verifyMintAuth",
+    "outputs": [
+      { "internalType": "bool", "name": "", "type": "bool" }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  }
+]

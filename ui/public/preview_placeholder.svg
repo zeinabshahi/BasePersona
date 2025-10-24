@@ -1,0 +1,23 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="g" cx="75%" cy="5%" r="100%">
+      <stop offset="0%" stop-color="#7B61FF" stop-opacity="0.45"/>
+      <stop offset="60%" stop-color="#0B1124" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#070A16" stop-opacity="1"/>
+    </radialGradient>
+  </defs>
+  <rect width="1024" height="1024" fill="url(#g)"/>
+  <g opacity="0.9">
+    <circle cx="820" cy="120" r="60" fill="#0052FF"/>
+    <circle cx="820" cy="120" r="36" fill="#FFFFFF"/>
+  </g>
+  <g fill="none" stroke="#6CF" stroke-opacity="0.5">
+    <circle cx="512" cy="540" r="280" stroke-width="2"/>
+    <circle cx="512" cy="540" r="220" stroke-width="1.5"/>
+    <circle cx="512" cy="540" r="150" stroke-width="1.5"/>
+  </g>
+  <g fill="#cfe3ff" font-family="Segoe UI, Roboto, Arial" font-weight="700" text-anchor="middle">
+    <text x="512" y="480" style="font-size:42px; letter-spacing:1px;">Preview Placeholder</text>
+    <text x="512" y="528" style="font-size:18px; opacity:.75;">Generate to render your onchain persona</text>
+  </g>
+</svg>

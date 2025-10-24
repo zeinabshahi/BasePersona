@@ -1,0 +1,3 @@
+This directory contains static assets used for post‑processing.
+
+Place your background PNGs in the `bg` subfolder and your logo at the root of `assets`.

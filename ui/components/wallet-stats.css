@@ -1,0 +1,148 @@
+/* ui/components/wallet-stats.css */
+:root{
+  --text:#0f172a;
+  --muted:#64748b;
+  --blue:#2563eb;
+  --blue-weak:#dbeafe;
+  --green:#16a34a;
+  --red:#ef4444;
+  --card:#ffffff;
+  --border:#e5e7eb;
+  --shadow:0 8px 24px rgba(2,6,23,.06);
+}
+
+.wsGrid{ display:grid; gap:12px; }
+
+.kpiRow{
+  display:grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap:12px;
+}
+
+.twoCols{
+  display:grid;
+  grid-template-columns: 1fr 1fr; /* هم‌عرض */
+  gap:12px;
+}
+
+/* ----------------------------- Card ----------------------------- */
+.card{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:18px;
+  box-shadow:var(--shadow);
+  padding:12px 14px;
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+}
+
+.kpiCard{ padding:14px; }
+
+/* عنوان بولدتر و کمی بزرگ‌تر */
+.sectionTitle{
+  font-size:14px;
+  font-weight:800;
+  color:var(--muted);
+}
+
+.titleWithRank{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+
+.rank{
+  font-size:12px;
+  color:var(--muted);
+  background:#f1f5f9;
+  border:1px solid var(--border);
+  border-radius:999px;
+  padding:3px 8px;
+}
+
+.sectionTop{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+}
+
+/* درصد تغییر */
+.delta{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  font-size:12px;
+  font-weight:700;
+  border-radius:999px;
+  padding:3px 8px;
+  border:1px solid var(--border);
+}
+.delta i{ width:8px; height:8px; border-radius:999px; background:var(--green); display:inline-block; }
+.delta.up{ color:var(--green); }
+.delta.down{ color:var(--red); }
+.delta.down i{ background:var(--red); }
+
+/* عدد بزرگ آبی */
+.bigNum{
+  color:var(--blue);
+  font-weight:800;
+  font-size:26px;
+}
+
+.kpiValue{
+  display:flex; align-items:baseline; gap:10px;
+}
+
+.muted{ color:var(--muted); font-size:12px; }
+.dim{ color:#94a3b8; }
+
+.ellipsis{
+  overflow:hidden; white-space:nowrap; text-overflow:ellipsis;
+}
+
+/* ------------------------------ Metrics rows ------------------------------ */
+.metricsRow{
+  display:grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap:12px;
+  padding-top:6px;
+}
+.metric{ text-align:center; }
+.metricNum{ line-height:1; }
+
+/* Holders row */
+.holdersRow{
+  display:grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap:12px;
+  align-items:center;
+  padding-top:6px;
+}
+.holderItem{ text-align:center; }
+.holderLabel{ font-size:12px; color:var(--muted); font-weight:700; }
+.holderValue{ color:var(--blue); font-weight:800; font-size:18px; }
+
+/* Pills */
+.pill{
+  display:inline-flex; align-items:center; justify-content:center;
+  min-width:48px; max-width:120px;
+  padding:6px 10px;
+  border-radius:999px;
+  font-weight:700; font-size:12px;
+  border:1px solid var(--border);
+  background:#f8fafc;
+}
+.pillGreen{ color:#0f5132; background:#dcfce7; border-color:#86efac; }
+.pillRed{ color:#7f1d1d; background:#fee2e2; border-color:#fecaca; }
+
+/* ------------------------------ Sparkline ------------------------------ */
+.spark{ width:100%; height:76px; }
+.sparkLine{ fill:none; stroke:var(--blue); stroke-width:2; stroke-linecap:round; }
+.sparkArea{ fill:rgba(37,99,235,.12); }
+
+/* Responsive */
+@media (max-width: 980px){
+  .kpiRow, .twoCols{ grid-template-columns: 1fr; }
+  .metricsRow, .holdersRow{ grid-template-columns: 1fr 1fr; }
+}

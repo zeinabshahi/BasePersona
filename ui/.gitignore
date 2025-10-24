@@ -1,0 +1,12 @@
+node_modules
+.next
+out
+.env
+.env.*.local
+artifacts
+coverage
+dist
+cache
+*.log
+.env.local
+README.md

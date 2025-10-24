@@ -1,0 +1,423 @@
+{
+  "meta": {
+    "version": "1.1",
+    "collection": "Base Persona",
+    "style": "Anime Cyberpunk",
+    "defaults": {
+      "aspect_ratio": "1:1",
+      "framing": "waist-up portrait, centered, symmetrical",
+      "lighting": "dynamic anime lighting, neon highlights",
+      "render": "cel-shaded line art, vibrant colors, ultra clean outlines",
+      "quality": "masterpiece, highly detailed",
+      "guidance_scale": 9,
+      "background_mode": "transparent",
+      "fallback_chroma_key": "#00FFFF",
+      "subject_scale": 0.92
+    }
+  },
+  "prompt_template": "waist-up anime-style portrait of a futuristic {body}, wearing {clothing} and {headwear}, {eyes}, with {accessory}, surrounded by {aura}, {emblem} above head{signature_clause}. dynamic anime lighting, neon glow accents, sharp cel-shaded line art, vibrant colors, symmetrical composition, high detail, 1:1, masterpiece, guidance scale 9, background transparent",
+  "rules": {
+    "genderGene": "wallet_birth_month % 2 == 1 ? 'Male' : 'Female'",
+    "background": "holds_both_nfts ? 'Dual Core' : (holds_any_nft ? 'Builder Grid' : 'Simple Blue')",
+    "layer_order": [
+      "Background",
+      "Body",
+      "Aura",
+      "Headwear",
+      "Eyes",
+      "Clothing",
+      "Accessory",
+      "Emblem",
+      "Signature"
+    ],
+    "signature_logic": {
+      "foundry_seal": "count_top_tiers >= 3",
+      "prime_forge": "count_top_tiers >= 5"
+    }
+  },
+  "layers": [
+    {
+      "name": "Background",
+      "source_metric": "nft_holdings",
+      "buckets": [
+        {
+          "when": "none",
+          "trait": {
+            "name": "Simple Blue",
+            "prompt": "clean flat digital blue background, subtle dots, minimal noise"
+          }
+        },
+        {
+          "when": "exactly_one",
+          "trait": {
+            "name": "Builder Grid",
+            "prompt": "blue background with geometric grid lines and soft neon streaks"
+          }
+        },
+        {
+          "when": "both",
+          "trait": {
+            "name": "Dual Core",
+            "prompt": "deep electric blue background with twin luminous energy rings and light rain of holographic particles"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Body",
+      "source_metric": "gender gene",
+      "buckets": [
+        {
+          "when": "male",
+          "trait": {
+            "name": "Male",
+            "prompt": "powerful male hero, athletic build, confident posture, anime facial structure"
+          }
+        },
+        {
+          "when": "female",
+          "trait": {
+            "name": "Female",
+            "prompt": "elegant female hero, athletic yet graceful, confident posture, anime facial structure"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Aura",
+      "source_metric": "wallet_age_days",
+      "ranges": [1, 100, 200, 300, 500, 800],
+      "buckets": [
+        {
+          "min": 1,
+          "max": 99,
+          "trait": {
+            "name": "Genesis Spark",
+            "prompt": "faint white aura softly glowing around the character"
+          }
+        },
+        {
+          "min": 100,
+          "max": 199,
+          "trait": {
+            "name": "Settler",
+            "prompt": "warm orange aura with gentle anime glow"
+          }
+        },
+        {
+          "min": 200,
+          "max": 299,
+          "trait": {
+            "name": "Pathfinder",
+            "prompt": "soft blue aura with geometric spark motes"
+          }
+        },
+        {
+          "min": 300,
+          "max": 499,
+          "trait": {
+            "name": "Veteran",
+            "prompt": "radiant purple aura with misty light trails"
+          }
+        },
+        {
+          "min": 500,
+          "max": 799,
+          "trait": {
+            "name": "Ancient",
+            "prompt": "gold aura with floating dust particles and ethereal shimmer"
+          }
+        },
+        {
+          "min": 800,
+          "max": null,
+          "trait": {
+            "name": "Relic",
+            "prompt": "intense golden aura with swirling runic circles and bright particle storm"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Headwear",
+      "source_metric": "unique_smart_contracts",
+      "ranges": [1, 10, 50, 100, 200, 500],
+      "buckets": [
+        {
+          "min": 1,
+          "max": 9,
+          "trait": {
+            "name": "Rookie Hair",
+            "prompt": "simple clean anime haircut, tidy strands, no accessories"
+          }
+        },
+        {
+          "min": 10,
+          "max": 49,
+          "trait": {
+            "name": "Field Beanie",
+            "prompt": "soft beanie hat with clean folds, minimal logo"
+          }
+        },
+        {
+          "min": 50,
+          "max": 99,
+          "trait": {
+            "name": "Multi-Tool Cap",
+            "prompt": "futuristic baseball cap with small metallic plates and neon seams"
+          }
+        },
+        {
+          "min": 100,
+          "max": 199,
+          "trait": {
+            "name": "Pro Visor",
+            "prompt": "sleek tech visor with thin glowing trim and circuit pattern"
+          }
+        },
+        {
+          "min": 200,
+          "max": 499,
+          "trait": {
+            "name": "Vanguard Helmet",
+            "prompt": "battle helmet with angular plates and embedded neon fins"
+          }
+        },
+        {
+          "min": 500,
+          "max": null,
+          "trait": {
+            "name": "Omni Headdress",
+            "prompt": "ornate cyber headdress with floating antenna segments and luminous sigils"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Eyes",
+      "source_metric": "active_distinct_days",
+      "ranges": [1, 10, 30, 50, 100, 250],
+      "buckets": [
+        {
+          "min": 1,
+          "max": 9,
+          "trait": {
+            "name": "Rookie Scan",
+            "prompt": "open curious anime eyes, simple black pupils, no highlight"
+          }
+        },
+        {
+          "min": 10,
+          "max": 29,
+          "trait": {
+            "name": "Adaptive Blink",
+            "prompt": "focused anime eyes with small digital glints and subtle highlight"
+          }
+        },
+        {
+          "min": 30,
+          "max": 49,
+          "trait": {
+            "name": "Multi-Angle Scan",
+            "prompt": "anime eyes with glowing concentric iris rings and shimmering edges"
+          }
+        },
+        {
+          "min": 50,
+          "max": 99,
+          "trait": {
+            "name": "360º Vision",
+            "prompt": "sharp anime eyes with multi-layered holographic pupils and intricate highlights"
+          }
+        },
+        {
+          "min": 100,
+          "max": 249,
+          "trait": {
+            "name": "Quantum Perception",
+            "prompt": "bright anime eyes with complex fractal iris patterns and swirling digital highlights"
+          }
+        },
+        {
+          "min": 250,
+          "max": null,
+          "trait": {
+            "name": "Omni-Gaze",
+            "prompt": "dazzling anime eyes with luminous multi-dimensional irises and endless depth"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Clothing",
+      "source_metric": "total_transactions",
+      "ranges": [1, 10, 50, 100, 200, 500],
+      "buckets": [
+        {
+          "min": 1,
+          "max": 9,
+          "trait": {
+            "name": "Apprentice Tunic",
+            "prompt": "simple fitted cyber jacket with clean lines and no insignia"
+          }
+        },
+        {
+          "min": 10,
+          "max": 49,
+          "trait": {
+            "name": "Field Jumper",
+            "prompt": "sleek jumpsuit with minimal piping and subtle padded shoulders"
+          }
+        },
+        {
+          "min": 50,
+          "max": 99,
+          "trait": {
+            "name": "Tactical Vest",
+            "prompt": "fitted tactical vest with modular pockets and neon seams"
+          }
+        },
+        {
+          "min": 100,
+          "max": 199,
+          "trait": {
+            "name": "Pro Exosuit",
+            "prompt": "streamlined exosuit with flexible armor plating and glowing trims"
+          }
+        },
+        {
+          "min": 200,
+          "max": 499,
+          "trait": {
+            "name": "Vanguard Armor",
+            "prompt": "hardened cyber armor with angular lines and integrated neon bands"
+          }
+        },
+        {
+          "min": 500,
+          "max": null,
+          "trait": {
+            "name": "Omni Regalia",
+            "prompt": "ornate ceremonial armor with complex engravings and radiant trims"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Accessory",
+      "source_metric": "distinct_tokens",
+      "ranges": [1, 5, 15, 30, 60, 100],
+      "buckets": [
+        {
+          "min": 1,
+          "max": 4,
+          "trait": {
+            "name": "Scout Band",
+            "prompt": "simple wristband with small glowing lights"
+          }
+        },
+        {
+          "min": 5,
+          "max": 14,
+          "trait": {
+            "name": "Core Medallion",
+            "prompt": "small circular medallion with pulsating neon core"
+          }
+        },
+        {
+          "min": 15,
+          "max": 29,
+          "trait": {
+            "name": "Multi-Tool Gauntlet",
+            "prompt": "sleek gauntlet with integrated tools and illuminated circuits"
+          }
+        },
+        {
+          "min": 30,
+          "max": 59,
+          "trait": {
+            "name": "Drone Companion",
+            "prompt": "small floating drone companion with glowing eyes and rotating propellers"
+          }
+        },
+        {
+          "min": 60,
+          "max": 99,
+          "trait": {
+            "name": "Vanguard Shield",
+            "prompt": "compact energy shield generator strapped to the arm with neon paneling"
+          }
+        },
+        {
+          "min": 100,
+          "max": null,
+          "trait": {
+            "name": "Omni Matrix",
+            "prompt": "matrix-like lattice of floating cubes and lines orbiting the character"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Emblem",
+      "source_metric": "dex_trades_and_nft_mints",
+      "ranges": [0, 5, 20, 100],
+      "buckets": [
+        {
+          "min": 0,
+          "max": 4,
+          "trait": {
+            "name": "Null Band",
+            "prompt": "no emblem"
+          }
+        },
+        {
+          "min": 5,
+          "max": 19,
+          "trait": {
+            "name": "Pulse Mark",
+            "prompt": "small pulsing symbol hovering above the head"
+          }
+        },
+        {
+          "min": 20,
+          "max": 99,
+          "trait": {
+            "name": "Core Sigil",
+            "prompt": "sharply defined glowing sigil hovering just above the head"
+          }
+        },
+        {
+          "min": 100,
+          "max": null,
+          "trait": {
+            "name": "Prime Insignia",
+            "prompt": "elaborate holographic emblem composed of layered geometric shapes and radiant light"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Signature",
+      "source_metric": "top_tier_counts",
+      "buckets": [
+        {
+          "min": 3,
+          "max": 4,
+          "trait": {
+            "name": "Foundry Seal",
+            "prompt": "small swirling ribbon of light wrapping around the character's waist"
+          }
+        },
+        {
+          "min": 5,
+          "max": null,
+          "trait": {
+            "name": "Prime Forge",
+            "prompt": "grand luminous halo of intertwined rings and complex magic sigils enveloping the character"
+          }
+        }
+      ]
+    }
+  ]
+}

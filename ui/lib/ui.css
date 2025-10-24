@@ -1,0 +1,547 @@
+/* ui/lib/ui.css */
+
+/* 1) فونت و توکن‌ها */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+
+:root{
+  --font: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  --bg:#F7F8FB;
+  --card:#FFFFFF;
+  --text:#0F172A;
+  --muted:#697386;
+  --accent:#0052FF;            /* آبی Base */
+  --accent-2:#7C3AED;          /* بنفش برای Mint */
+  --success:#16A34A;
+  --danger:#EF4444;
+  --border:#E7E9EE;
+  --shadow: 0 6px 28px rgba(2, 6, 23, .06);
+
+  --radius:14px;
+  --radius-card:16px;
+
+  --h-btn:42px;
+  --h-chip:34px;
+
+  --num:#0B5FFF;               /* رنگ عددها */
+}
+
+/* 2) پایه */
+html,body,#__next{height:100%}
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--text);
+  font-family:var(--font);
+  -webkit-font-smoothing:antialiased;
+  -moz-osx-font-smoothing:grayscale;
+}
+
+/* 3) لایه‌ها */
+.appShell{}
+.header{ position:sticky; top:0; z-index:40; background:rgba(255,255,255,.9); backdrop-filter:saturate(180%) blur(8px); border-bottom:1px solid var(--border); }
+.headerInner{ max-width:1200px; margin:0 auto; padding:12px 16px; display:flex; align-items:center; justify-content:space-between; gap:16px; }
+.brandBlock{ display:flex; gap:12px; align-items:center; }
+.brandLogo{ width:36px; height:36px; border-radius:10px; box-shadow: 0 2px 8px rgba(2,6,23,.08); }
+.brandTitle{ font-size:16px; font-weight:800; letter-spacing:.2px; }
+.brandSub{ font-size:12px; color:var(--muted); }
+
+.container{ max-width:1200px; margin:16px auto; padding:0 16px; }
+.main{}
+
+/* 4) کارت‌ها */
+.card{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:var(--radius-card);
+  box-shadow:var(--shadow);
+  padding:14px;
+}
+
+.statGrid{ display:grid; grid-template-columns: repeat(12, 1fr); gap:16px; }
+.statCard{
+  grid-column: span 4;                 /* در دسکتاپ سه‌تایی */
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:var(--radius-card);
+  padding:16px;
+  box-shadow:var(--shadow);
+  transition: transform .12s ease, box-shadow .18s ease;
+}
+.statCard:hover{ transform: translateY(-2px) scale(1.01); box-shadow: 0 10px 36px rgba(0,82,255,.10); }
+.statHead{ font-size:13px; color:var(--muted); margin-bottom:8px; display:flex; justify-content:space-between; align-items:center; }
+.statNum{ font-size:28px; font-weight:800; color:var(--num); line-height:1; }
+.trendLine{ height:6px; background: linear-gradient(90deg, #DFE7FF, #CFE0FF); border-radius:3px; margin-top:10px; }
+
+.kpiRow{ display:flex; gap:18px; margin-top:8px; }
+.kpiCol{ display:flex; flex-direction:column; gap:6px; }
+.kpiLabel{ font-size:12px; color:var(--muted); }
+.kpiNum{ font-weight:800; color:var(--num); }
+
+/* جایگزین برای مقادیر پیش‌فرض */
+.placeholder{ color:#A8B1C5 !important; text-decoration: dotted underline 1px rgba(0,0,0,.12); }
+
+/* 5) YES/NO Pills */
+.pill{ padding:4px 10px; border-radius:999px; font-weight:800; font-size:12px; width:fit-content; }
+.pill.yes{ background:rgba(22,163,74,.10); color:var(--success); border:1px solid rgba(22,163,74,.25); }
+.pill.no{ background:rgba(239,68,68,.10); color:var(--danger); border:1px solid rgba(239,68,68,.25); }
+
+/* 6) اینپوت و دکمه‌ها — هماهنگ با Web3Modal */
+.input{
+  height:var(--h-btn);
+  padding:0 14px;
+  border:1px solid var(--border);
+  border-radius:var(--radius);
+  background:#fff;
+  outline:none;
+  flex:1;
+}
+.input:focus{ border-color:#cbd5ff; box-shadow:0 0 0 3px rgba(0,82,255,.08) }
+
+.btn{
+  height:var(--h-btn);
+  padding:0 16px;
+  border-radius:var(--radius);
+  border:1px solid var(--border);
+  background:#F5F7FB;
+  font-weight:800;
+  cursor:pointer;
+  transition: transform .05s ease, box-shadow .15s ease;
+}
+.btn:hover{ box-shadow: 0 2px 10px rgba(17,24,39,.06) }
+.btn:active{ transform: scale(.98) }
+.btn[disabled]{ opacity:.6; cursor:not-allowed; box-shadow:none }
+
+.btn.primary{ background:var(--accent); color:#fff; border-color:transparent; }
+.btn.gradient{ background:linear-gradient(90deg,var(--accent-2), #A78BFA); color:#fff; border-color:transparent; }
+
+/* چیپ/بج */
+.chip{
+  height:34px; padding:0 12px; border-radius:999px; border:1px solid var(--border); background:#fff; font-weight:700; cursor:pointer;
+}
+.badge{
+  height:34px; padding:0 10px; border-radius:999px; background:#F2F4F8; color:#111827; display:flex; align-items:center; border:1px solid var(--border);
+}
+
+/* گروه‌های عمومی */
+.row{ display:flex; gap:10px; }
+.row.center{ align-items:center; }
+.row.wrap{ flex-wrap:wrap; align-items:center; }
+.spacer{ flex:1 }
+.muted{ color:var(--muted) }
+.small{ font-size:12px }
+
+/* Preview image */
+.previewImg{ width:100%; height:420px; object-fit:cover; display:block; border-radius:12px; border:1px solid var(--border); }
+
+/* دو ستونه */
+.twoColumn{ display:grid; grid-template-columns: 1fr 520px; gap:20px; align-items:stretch; }
+.fullHeight{ height:100%; display:flex; flex-direction:column; }
+
+
+/* ریسپانسیو کارت‌های KPI */
+@media (max-width: 1024px){ .statCard{ grid-column: span 6; } .twoColumn{ grid-template-columns: 1fr; } }
+@media (max-width: 640px){ .statCard{ grid-column: span 12; } }
+
+/* تعادل و هماهنگی کارت‌ها */
+.statGrid{
+  display:grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap:12px;
+}
+.statCard{
+  grid-column: span 4;
+  background:#fff;
+  border-radius:16px;
+  box-shadow: 0 1px 0 rgba(12,18,28,.06), 0 6px 22px rgba(12,18,28,.06);
+  padding:14px 16px;
+}
+.statCard.span-6{ grid-column: span 6; }
+
+.statHead{ display:flex; justify-content:space-between; align-items:center; font-weight:700; color:#4b5563; }
+.statNum{ font-size:28px; font-weight:900; color:#2563eb; margin-top:6px; }
+.kpiRow{ display:flex; gap:12px; }
+.kpiCol{ display:flex; flex-direction:column; gap:6px; min-width:0; }
+.kpiCol.center{ align-items:center; }
+.kpiLabel{ font-size:12px; color:var(--muted); font-weight:700; }
+.kpiNum{ font-size:18px; font-weight:800; color:#2563eb; }
+
+.gridAuto{
+  display:grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px,1fr));
+  gap:12px;
+  margin-top:12px;
+}
+
+/* نمودار خطی لمسی */
+.chartWrap{ position:relative; width:100%; user-select:none; margin-top:10px; }
+.chartTip{
+  position:absolute; top:-6px; transform:translateX(-50%);
+  background:#111827; color:#fff; font-size:11px; padding:2px 6px; border-radius:6px;
+  box-shadow:0 6px 20px rgba(17,24,39,.18);
+}
+
+/* قرص‌های Yes/No */
+.pill{ display:inline-flex; align-items:center; justify-content:center; height:28px; padding:0 12px; border-radius:999px; font-weight:800; font-size:12px;}
+.pill.yes{ background:#dcfce7; color:#16a34a; }
+.pill.no{ background:#fee2e2; color:#ef4444; }
+
+/* Placeholder look برای مقادیر پیش‌فرض */
+.placeholder{ opacity:.5; filter:saturate(.6); }
+@media (max-width: 920px){
+  .statCard{ grid-column: span 12; }
+  .statCard.span-6{ grid-column: span 12; }
+}
+
+
+.statGrid{ display:grid; grid-template-columns: repeat(12,1fr); gap:12px; }
+.statCard{ grid-column: span 4; background:#fff; border-radius:16px; box-shadow:0 1px 0 rgba(12,18,28,.06), 0 6px 22px rgba(12,18,28,.06); padding:14px 16px; }
+.statCard.span-6{ grid-column: span 6; }
+.statHead{ display:flex; justify-content:space-between; align-items:center; font-weight:700; color:#4b5563; }
+.statMain{ display:flex; align-items:center; gap:8px; margin-top:4px; }
+.statNum{ font-size:28px; font-weight:900; color:#2563eb; }
+.delta{ font-size:12px; font-weight:800; padding:2px 8px; border-radius:999px; }
+.delta.up{ background:#dcfce7; color:#16a34a; }
+.delta.down{ background:#fee2e2; color:#ef4444; }
+
+.gridAuto{ display:grid; grid-template-columns: repeat(auto-fit, minmax(120px,1fr)); gap:12px; margin-top:12px; }
+.kpiCol{ display:flex; flex-direction:column; gap:6px; }
+.kpiCol.center{ align-items:center; }
+.kpiLabel{ font-size:12px; color:var(--muted); font-weight:700; }
+.kpiNum{ font-size:18px; font-weight:800; color:#2563eb; }
+.pill{ display:inline-flex; align-items:center; justify-content:center; height:28px; padding:0 12px; border-radius:999px; font-weight:800; font-size:12px;}
+.pill.yes{ background:#dcfce7; color:#16a34a; }
+.pill.no{ background:#fee2e2; color:#ef4444; }
+.placeholder{ opacity:.5; filter:saturate(.6); }
+
+.chartWrap{ position:relative; width:100%; user-select:none; margin-top:10px; }
+.chartTip{ position:absolute; top:-6px; transform:translateX(-50%); background:#111827; color:#fff; font-size:11px; padding:4px 6px; border-radius:6px; box-shadow:0 6px 20px rgba(17,24,39,.18); white-space:nowrap; }
+.tipSub{ opacity:.8; font-size:10px; }
+
+@media (max-width: 920px){
+  .statCard, .statCard.span-6{ grid-column: span 12; }
+}
+
+
+:root{
+  --brand:#2563eb;
+  --brand-900:#1e3a8a;
+  --muted:#64748b;
+  --bg:#f6f8fb;
+  --card:#ffffff;
+  --border:#eef1f7;
+  --radius:16px;
+  --shadow:0 10px 24px rgba(2,6,23,.06);
+  --ring: 0 0 0 4px rgba(37,99,235,.12);
+  --font: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
+}
+
+/* Web3Modal theme sync */
+:root {
+  --w3m-font-family: var(--font);
+  --w3m-accent: var(--brand);
+  --w3m-color-bg-1: #ffffff;
+  --w3m-color-bg-2: #ffffff;
+}
+
+html,body{ background:var(--bg); font-family:var(--font); color:#0f172a; }
+.appHeader{ position:sticky; top:0; z-index:20; backdrop-filter: blur(6px);
+  background:rgba(255,255,255,.75); border-bottom:1px solid var(--border); }
+.headerInner{ max-width:1200px; margin:0 auto; height:64px; display:flex; align-items:center; gap:12px; padding:0 16px; }
+.brandMark img{ width:32px; height:32px; display:block; }
+.grow{ flex:1; }
+
+.container{ padding:16px; margin:0 auto; }
+.card{ background:var(--card); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); }
+.cardHeader{ display:flex; align-items:center; justify-content:space-between; padding:12px 14px; border-bottom:1px solid var(--border); }
+.toolbar{ display:flex; gap:8px; }
+
+.row{ display:flex; gap:10px; }
+.row.align{ align-items:center; }
+.row.wrap{ flex-wrap:wrap; align-items:center; gap:10px; }
+.spacer{ flex:1; }
+.twoCol{ display:grid; grid-template-columns: 1fr 520px; gap:16px; margin-top:16px; }
+
+.input{ flex:1; height:40px; border-radius:12px; border:1px solid #e5e7eb; padding:0 12px; outline:none; background:#fff; }
+.input:focus{ border-color:var(--brand); box-shadow:var(--ring); }
+
+.btn{ height:40px; padding:0 14px; border-radius:12px; border:1px solid #e5e7eb; background:#fff; cursor:pointer; }
+.btn:hover{ box-shadow:var(--shadow); }
+.btn.primary{ background:var(--brand); color:#fff; border-color:var(--brand); }
+.btn.gradient{ background: linear-gradient(90deg,#7c3aed,#a78bfa); color:#fff; border:none; }
+
+.chip{ height:30px; padding:0 10px; border-radius:999px; border:1px solid #e5e7eb; background:#fff; font-size:12px; cursor:pointer; }
+.badge{ background:#f1f5f9; color:#475569; border-radius:999px; padding:6px 10px; font-size:12px; }
+.badge.demo{ background:rgba(37,99,235,.08); color:#1e40af; border:1px dashed var(--brand); }
+
+.personaText p{ margin:.25rem 0; color:#0f172a; }
+.personaText p + p{ margin-top:.35rem; }
+.muted{ color:var(--muted); }
+.small{ font-size:13px; }
+
+.previewWrap{ display:grid; grid-template-columns: 360px 1fr; gap:12px; padding:14px; }
+.previewImg{ width:100%; height:420px; border-radius:12px; object-fit:cover; border:1px solid var(--border); }
+
+.hoverable{ transition: transform .15s ease, box-shadow .15s ease; }
+.hoverable:hover{ transform: translateY(-2px); box-shadow:0 16px 28px rgba(2,6,23,.1); }
+
+.statsGrid{ display:grid; gap:12px; }
+.grid3{ display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+.grid2{ display:grid; grid-template-columns:repeat(2,1fr); gap:12px; }
+
+.kpiCard{ padding:14px; }
+.kpiHead{ display:flex; gap:12px; align-items:baseline; justify-content:space-between; }
+.kpiLabel{ font-size:13px; color:var(--muted); font-weight:700; }
+.kpiValue{ font-size:28px; color:var(--brand); font-weight:800; }
+.kpiHint{ font-size:12px; color:var(--muted); margin-top:4px; }
+
+.sectionTitle{ display:flex; align-items:center; gap:10px; padding:12px 14px; border-bottom:1px solid var(--border); font-weight:700; }
+.holdersRow{ display:grid; grid-template-columns: repeat(3,1fr); gap:10px; padding:12px 14px; }
+.holderItem{ text-align:center; }
+.holderLabel{ font-size:13px; color:var(--muted); }
+.holderLabel.dim{ opacity:.9; }
+.holderValue{ font-size:18px; color:var(--brand); font-weight:800; }
+
+.metricsRow{ display:grid; grid-template-columns: repeat(3,1fr); gap:10px; padding:12px 14px; }
+.metric{ text-align:center; }
+.metricLabel{ font-size:12px; color:var(--muted); }
+.metricValue{ font-size:20px; color:var(--brand); font-weight:800; }
+
+.pill{ display:inline-flex; align-items:center; justify-content:center; min-width:52px; height:32px; padding:0 10px; border-radius:999px; font-weight:700; }
+.pillGreen{ background:#e8f7ef; color:#089160; border:1px solid #b9ead3; }
+.pillRed{ background:#fde8e8; color:#d61f1f; border:1px solid #fbd1d1; }
+
+.chart{ margin-top:8px; border-radius:10px; overflow:hidden; }
+
+/* افزوده‌ها برای دلتا/رتبه و هماهنگی چیدمان */
+.delta{ padding:4px 8px; border-radius:999px; font-size:12px; font-weight:700; }
+.delta.up{ background:rgba(16,185,129,.12); color:#047857; }
+.delta.down{ background:rgba(239,68,68,.12); color:#b91c1c; }
+.delta .arrow{ font-size:10px; margin-right:4px; }
+
+.twoCol{ display:grid; grid-template-columns: 1fr 520px; gap:16px; }
+.previewWrap{ display:grid; grid-template-columns: 1fr; gap:12px; padding:14px; }
+.previewImg{ width:100%; height:420px; border-radius:12px; object-fit:cover; border:1px solid var(--border); }
+
+.statsGrid{ display:grid; gap:16px; }
+.grid3{ display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
+.grid2{ display:grid; grid-template-columns:repeat(2,1fr); gap:16px; }
+
+.kpiCard{ padding:14px; }
+.kpiHead{ display:flex; gap:12px; align-items:center; justify-content:space-between; }
+
+/* Title + Rank in header (left side) */
+.sectionTop{ display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 12px 0 12px; }
+.titleWithRank{ display:flex; align-items:center; gap:8px; min-width:0; }
+.sectionTitle{ font-size:13px; font-weight:700; color:var(--muted); }
+
+/* KPI visuals */
+.kpiCard{ padding:12px; }
+.kpiValue{ color:#2563eb; font-weight:800; font-size:26px; margin:6px 12px 0; }
+
+/* Unified chart baseline & spacing */
+.chartFrame{ margin:8px 12px 12px; }   /* ← فاصله کف همه کارت‌ها یکسان */
+.chart{ display:block; }
+
+/* Metrics/Holders rows */
+.metricsRow{ display:flex; gap:12px; justify-content:space-between; padding:12px; }
+.metric{ flex:1; text-align:center; min-width:0; }
+.metricValue{ color:#2563eb; font-weight:800; font-size:18px; }
+.metricLabel{ font-size:12px; color:var(--muted); }
+
+.holdersRow{ display:flex; gap:12px; justify-content:space-between; padding:12px; }
+.holderItem{ flex:1; text-align:center; min-width:0; }
+.holderLabel{ font-size:12px; color:var(--muted); margin-bottom:6px; }
+.holderValue{ color:#2563eb; font-weight:800; font-size:18px; }
+
+/* Deltas / Badges / Pills */
+.delta{ padding:4px 8px; border-radius:999px; font-size:12px; font-weight:700; white-space:nowrap; }
+.delta.up{ background:rgba(16,185,129,.12); color:#047857; }
+.delta.down{ background:rgba(239,68,68,.12); color:#b91c1c; }
+.delta .arrow{ font-size:10px; margin-right:4px; }
+
+.badge, .chip, .btn {
+  display:inline-flex; align-items:center; justify-content:center;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.badge{ padding:6px 10px; border-radius:999px; border:1px solid var(--border); font-size:12px; font-weight:700; background:#fff; }
+.chip{ padding:8px 12px; border-radius:999px; border:1px solid var(--border); font-size:12px; background:#fff; }
+.btn{ padding:10px 14px; border-radius:12px; border:1px solid var(--border); background:#fff; font-weight:700; cursor:pointer; }
+.btn.primary{ background:#2563eb; color:#fff; border-color:#2563eb; }
+.btn.gradient{ background:linear-gradient(90deg,#7c3aed,#a78bfa); color:#fff; border:none; }
+.pill{ padding:6px 12px; border-radius:999px; font-size:12px; font-weight:800; min-width:52px; }
+.pillGreen{ background:rgba(16,185,129,.12); color:#047857; }
+.pillRed{ background:rgba(239,68,68,.12); color:#b91c1c; }
+.ellipsis{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:180px; }
+
+/* Layout grids */
+.statsGrid{ display:grid; gap:16px; }
+.grid3{ display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
+.grid2{ display:grid; grid-template-columns:repeat(2,1fr); gap:16px; }
+
+/* Persona & Preview equal height */
+.twoCol{ display:grid; grid-template-columns:1fr 520px; gap:16px; align-items:stretch; }
+.lockHeight .col{ display:flex; min-height:520px; }
+.lockHeight .col > .card{ height:100%; display:flex; flex-direction:column; }
+.lockHeight .col > .card .cardHeader{ padding:12px; }
+
+/* چون PersonaText خودش card است، این قانون ارتفاعش را قفل می‌کند */
+.lockHeight .col > .card,
+.lockHeight .col > .card.card { height:100%; }
+
+/* Preview */
+.previewWrap{ display:grid; grid-template-columns:1fr; gap:12px; padding:14px; }
+.previewImg{ width:100%; height:420px; border-radius:12px; object-fit:cover; border:1px solid var(--border); }
+
+/* عمومی */
+.row.align{ display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+.input{ min-width:320px; }
+.hoverable{ transition:transform .18s ease, box-shadow .18s ease; }
+.hoverable:hover{ transform:translateY(-1px); box-shadow:0 6px 20px rgba(0,0,0,.06); }
+
+
+/* ===== GM Card & Badges ===== */
+.gmCard{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:16px;
+  box-shadow: var(--shadow);
+  padding:14px;
+}
+
+.gmHeader{
+  display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px;
+}
+.gmTitle{ font-weight:800; font-size:14px; }
+.gmSub{ font-size:12px; color:var(--muted); }
+
+.gmBar{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.gmBadge{
+  position:relative;
+  width:40px; height:40px;
+  border-radius:999px;
+  display:flex; align-items:center; justify-content:center;
+  background:#fff; border:1px solid var(--border);
+  box-shadow: 0 2px 12px rgba(11,95,255,.06);
+  overflow:hidden;
+}
+.gmBadge img{ width:100%; height:100%; object-fit:cover; display:block; }
+
+.gmBadge.locked{ filter: grayscale(1) opacity(.45); }
+.gmBadge.claimable{ filter:none; }
+.gmBadge.claimed{ filter:none; outline:2px solid #0B5FFF; }
+
+.gmClaimBtn{
+  font-size:11px; font-weight:700; text-decoration:underline;
+  background:transparent; border:none; cursor:pointer; color:#0f172a;
+}
+
+.gmCheck{
+  position:absolute; right:-2px; top:-2px;
+  background:#0B5FFF; color:#fff; border-radius:999px; font-size:10px; padding:2px 6px;
+  box-shadow: 0 2px 8px rgba(11,95,255,.25);
+}
+
+
+/* --- Full-width chart container --- */
+.chartWrap { width: 100%; position: relative; user-select: none; }
+
+.spark { display: block; width: 100%; }
+.sparkLine {
+  stroke: #2563eb;
+  stroke-width: 2;
+  fill: none;
+  opacity: .95;
+  /* انیمیشن ورود خط */
+  stroke-dasharray: 1200;
+  stroke-dashoffset: 1200;
+  animation: ws-line-draw 900ms ease-out forwards;
+}
+.sparkArea {
+  fill: rgba(37, 99, 235, 0.12);
+}
+
+/* انیمیشن رسم خط */
+@keyframes ws-line-draw {
+  to { stroke-dashoffset: 0; }
+}
+
+/* هاور لطیف روی کارت‌ها (احساس زنده بودن فریم‌ها) */
+.card {
+  transition: transform .18s ease, box-shadow .25s ease, border-color .25s ease;
+}
+.card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 36px rgba(11,95,255,.12);
+  border-color: rgba(11,95,255,.18);
+}
+
+/* هنگام هاور کارت، خط کمی برجسته‌تر شود */
+.card:hover .sparkLine { opacity: 1; }
+
+/* Web3Modal v3/v2 – تم یکپارچه */
+:root {
+  --w3m-font-family: var(--font);
+  /* عرض بیشتر مودال: */
+  --w3m-modal-width: 480px;
+  /* شعاع و تایپو عمومی مودال: */
+  --w3m-border-radius-master: 16px;
+  --w3m-font-size-master: 14px;
+  /* بک‌گراند اورلی شفاف (بدون تاریک شدن صفحه) */
+  --w3m-overlay-background-color: transparent;
+  /* رنگ‌های زمینه */
+  --w3m-accent: #2563eb;           /* برای واریانت‌های قدیمی */
+  --w3m-accent-color: #2563eb;     /* برای v3 */
+  --w3m-background-color: #ffffff;
+  --w3m-color-bg-1: #ffffff;       /* برای v2 */
+  --w3m-color-bg-2: #ffffff;
+  --w3m-z-index: 70;
+}
+
+/* اگر قبلاً scale روی w3m-modal گذاشتی، حذف/بی‌اثر کن */
+w3m-modal { transform: none !important; }
+
+/* برای اطمینان، بک‌درآپ را هم شفاف کن */
+w3m-modal::part(backdrop) { background: transparent !important; }
+
+/* سوپر اسکریپت برای Longest Streak روی دکمه GM */
+.gmSup{
+  font-size: 10px;
+  font-weight: 800;
+  color: var(--muted);
+  position: relative;
+  top: -0.4em; /* حس عددِ به‌ توان */
+}
+
+
+:root{
+  --w3m-modal-width: 520px;
+  --w3m-overlay-background-color: transparent;
+}
+w3m-modal { transform: none !important; }
+w3m-modal::part(backdrop){ background: transparent !important; }
+
+/* حالت claimable: کمی برجسته‌تر (هدر سفیدت حفظ میشه) */
+.header .chip.gmClaimable{
+  background: linear-gradient(180deg, rgba(37,99,235,.06), rgba(37,99,235,.0));
+  border-color: rgba(37,99,235,.25);
+  box-shadow: 0 6px 20px rgba(37,99,235,.12);
+}
+
+/* Slim connect button */
+.btn.slim {
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 10px;           /* گوشه‌ها کمتر (صُلف‌تر) */
+  font-weight: 800;
+  line-height: 34px;
+}
+.btn.slim.primary {
+  background: var(--brand, #2563eb);
+  color: #fff;
+  border-color: transparent;
+}
+.btn.slim.warn {
+  background: #fff;
+  color: #b45309;
+  border-color: #f59e0b;
+}
