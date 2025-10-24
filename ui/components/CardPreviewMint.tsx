@@ -1,3 +1,5 @@
+'use client'
+
 import React, { useEffect, useState } from 'react'
 import { useAccount, useReadContract, useWriteContract } from 'wagmi'
 import { keccak256, formatEther } from 'viem'
@@ -14,6 +16,7 @@ const gateAbi = [
   { type: 'function', name: 'payGenerate', stateMutability: 'payable', inputs: [], outputs: [] },
 ] as const
 
+// ---------- Small utils ----------
 const btn = (grad: string): React.CSSProperties => ({
   padding: '10px 14px',
   borderRadius: 12,
@@ -31,21 +34,49 @@ const btn = (grad: string): React.CSSProperties => ({
 })
 const btnDisabled: React.CSSProperties = { opacity: 0.5, cursor: 'not-allowed' }
 
+function safeAtob(b64: string): string {
+  if (typeof window !== 'undefined' && typeof window.atob === 'function') return window.atob(b64)
+  // Node/SSR: برمی‌گردونیم رشته‌ی خالی تا کرش نکند
+  return ''
+}
+
 function dataUrlBytes(dataUrl: string): Uint8Array {
   const b64 = dataUrl.split(',')[1] || ''
-  const bin = typeof atob !== 'undefined' ? atob(b64) : ''
+  const bin = safeAtob(b64)
   const arr = new Uint8Array(bin.length)
   for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i)
   return arr
 }
 
 // نمایش ETH با گرد کردن تا ۶ رقم اعشار
-function fmtEth(wei: any, decimals = 6): string {
+function fmtEth(wei: unknown, decimals = 6): string {
   try {
-    const s = formatEther(BigInt(wei ?? 0))
+    const s = formatEther(toBigIntSafe(wei))
     const n = Number(s)
     return n.toFixed(decimals).replace(/\.?0+$/, '')
   } catch { return '0' }
+}
+
+function toBigIntSafe(x: unknown): bigint {
+  try {
+    if (typeof x === 'bigint') return x
+    if (typeof x === 'number') return BigInt(Math.trunc(x))
+    if (typeof x === 'string' && x.trim() !== '') return BigInt(x)
+    // wagmi ممکنه ساختارهایی مثل { _hex: '0x..' } بده — موارد زیر را هم هندل می‌کنیم:
+    if (x && typeof x === 'object' && '_hex' in (x as any)) {
+      const hex = (x as any)._hex as string
+      return BigInt(hex)
+    }
+  } catch {}
+  return 0n
+}
+
+function toNumberSafe(x: unknown, fallback = 0): number {
+  if (x == null) return fallback
+  if (typeof x === 'number') return x
+  if (typeof x === 'bigint') return Number(x)
+  const n = Number(x as any)
+  return Number.isFinite(n) ? n : fallback
 }
 
 // ───────────── SVG Overlay
@@ -97,15 +128,23 @@ function LiveOverlay({
       {/* Badge */}
       {badgeText && (
         <>
-          <rect x="806" y="32" rx="14" ry="14" width="170" height="44"
-            fill="rgba(255,215,0,0.12)" stroke="rgba(255,215,0,0.55)"/>
-          <text x="891" y="62" textAnchor="middle" style={{ font: '700 22px Inter', fill: 'rgba(255,215,0,0.95)' }}>{badgeText}</text>
+          <rect
+            x="806" y="32" rx="14" ry="14" width="170" height="44"
+            fill="rgba(255,215,0,0.12)" stroke="rgba(255,215,0,0.55)"
+          />
+          <text x="891" y="62" textAnchor="middle" style={{ font: '700 22px Inter', fill: 'rgba(255,215,0,0.95)' }}>
+            {badgeText}
+          </text>
         </>
       )}
 
-      {title && <text x={pad} y={pad+10} style={{ font: '800 40px Inter,Segoe UI,Arial', fill: '#fff' }}>{title}</text>}
+      {title && <text x={pad} y={pad + 10} style={{ font: '800 40px Inter,Segoe UI,Arial', fill: '#fff' }}>{title}</text>}
       {addressStr && (
-        <text x={pad} y={pad + (title ? 52 : 50)} style={{ font: '600 26px Inter,Segoe UI,Arial', fill: 'rgba(255,255,255,.9)' }}>
+        <text
+          x={pad}
+          y={pad + (title ? 52 : 50)}
+          style={{ font: '600 26px Inter,Segoe UI,Arial', fill: 'rgba(255,255,255,.9)' }}
+        >
           {addressStr}
         </text>
       )}
@@ -203,11 +242,13 @@ export default function CardPreviewMint({
 
   const mintFeeEth = fmtEth(mintFeeWei)
   const genFeeEth  = fmtEth(genFeeWei)
-  const genFeeUsd  = ethUsd && genFeeWei ? (Number(formatEther(BigInt(genFeeWei))) * ethUsd) : null
+  const genFeeUsd  = (ethUsd != null && genFeeWei != null)
+    ? Number(formatEther(toBigIntSafe(genFeeWei))) * ethUsd
+    : null
 
   // Quota (حتی بدون Gate → پیش‌فرض)
-  const cap = Number(gateCap ?? 2)
-  const rem = Number(gateRemain ?? cap)
+  const cap = toNumberSafe(gateCap, 2)
+  const rem = toNumberSafe(gateRemain, cap)
   const used = Math.max(0, cap - rem)
   const pct  = Math.max(0, Math.min(100, Math.round((used / (cap || 1)) * 100)))
   const quotaStr = `${used}/${cap} today`
@@ -235,14 +276,14 @@ export default function CardPreviewMint({
     setError(null)
 
     // سهمیه روزانه
-    if (GATE && (gateRemain !== undefined) && Number(gateRemain) === 0) {
+    if (GATE && gateRemain !== undefined && toNumberSafe(gateRemain) === 0) {
       setError('Daily generate limit reached. Try again tomorrow.')
       return
     }
 
     // پرداخت
     let payHash: string | null = null
-    if (GATE && genFeeWei) {
+    if (GATE && genFeeWei != null) {
       setBusy(b => ({ ...b, paying: true }))
       try {
         const txHash = await writeContractAsync({
@@ -250,7 +291,7 @@ export default function CardPreviewMint({
           abi: gateAbi as any,
           functionName: 'payGenerate',
           args: [],
-          value: BigInt(genFeeWei as any),
+          value: toBigIntSafe(genFeeWei),
         })
         payHash = String(txHash)
         setPayTx(payHash)
@@ -335,11 +376,11 @@ export default function CardPreviewMint({
       if (!sc?.sig) throw new Error(sc?.error || 'sign_claim_failed')
 
       // 3) Contract mint
-      const value = BigInt((mintFeeWei as any) || 0)
+      const value = toBigIntSafe(mintFeeWei)
       const args = [ { to: address, tokenURI, imageHash, deadline, nonce }, sc.sig ] as any
       const txHash = await writeContractAsync({ address: CONTRACT, abi: bmImage721Abi as any, functionName: 'claim', args, value })
       setMintTx(String(txHash))
-      alert('Mint tx sent: ' + txHash)
+      if (typeof window !== 'undefined') window.alert('Mint tx sent: ' + txHash)
     } catch(e:any) { setError(String(e?.message || e)) }
     finally { setBusy(b=>({ ...b, mint:false })) }
   }
@@ -374,8 +415,8 @@ export default function CardPreviewMint({
       <div style={{ display:'grid', gridTemplateColumns:'repeat(3, minmax(0, 1fr))', gap: 10, alignItems:'center' }}>
         <button
           onClick={()=>generateBase({ prompt: defaultPrompt })}
-          disabled={!!busy.gen || !!busy.paying || (GATE && gateRemain!==undefined && Number(gateRemain)===0)}
-          style={{ ...btn('linear-gradient(135deg,#7c3aed,#2563eb)'), ...((busy.gen||busy.paying||(GATE && gateRemain!==undefined && Number(gateRemain)===0))?btnDisabled:{}) }}
+          disabled={!!busy.gen || !!busy.paying || (GATE && gateRemain!==undefined && toNumberSafe(gateRemain)===0)}
+          style={{ ...btn('linear-gradient(135deg,#7c3aed,#2563eb)'), ...((busy.gen||busy.paying||(GATE && gateRemain!==undefined && toNumberSafe(gateRemain)===0))?btnDisabled:{}) }}
           title={GATE ? 'Pay & Generate' : 'Generate'}
         >
           {busy.paying ? 'Paying…' : 'Generate'}
