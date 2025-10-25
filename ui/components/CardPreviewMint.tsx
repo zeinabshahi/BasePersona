@@ -145,6 +145,81 @@ function escapeAddress(s: string): string {
   return escapeXml(s)
 }
 
+// ---------- Live overlay component (for on-page preview)
+function LiveOverlay({
+  title,
+  addressStr,
+  stats,
+  badgeText,
+  logoHref = '/base_logo.svg',
+}: {
+  title?: string
+  addressStr?: string
+  stats: Stat[]
+  badgeText?: string
+  logoHref?: string
+}) {
+  const pad = 48
+  const line = 44
+  const n = Math.min(6, stats.length)
+  const rows = Array.from({ length: n }).map((_, i) => {
+    const y = 1024 - pad - 20 - (n - 1 - i) * line
+    const s = stats[i]
+    return (
+      <text key={i} x={pad} y={y} style={{ font: '500 28px Inter,Segoe UI,Arial', fill: 'rgba(255,255,255,.95)' }}>
+        {s.label}: <tspan style={{ fontWeight: 700 }}>{s.value}</tspan>
+      </text>
+    )
+  })
+
+  return (
+    <svg viewBox="0 0 1024 1024" preserveAspectRatio="none" width="100%" height="100%">
+      <defs>
+        <linearGradient id="topFade" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="rgba(0,0,0,.55)" />
+          <stop offset="60%" stopColor="rgba(0,0,0,0)" />
+        </linearGradient>
+        <linearGradient id="bottomFade" x1="0" y1="1" x2="0" y2="0">
+          <stop offset="0%" stopColor="rgba(0,0,0,.50)" />
+          <stop offset="55%" stopColor="rgba(0,0,0,0)" />
+        </linearGradient>
+      </defs>
+
+      <rect width="1024" height="430" fill="url(#topFade)" />
+      <rect y="594" width="1024" height="430" fill="url(#bottomFade)" />
+
+      {/* Base logo */}
+      <image href={logoHref} x="904" y="32" width="88" height="88" />
+
+      {/* Badge */}
+      {badgeText && (
+        <>
+          <rect
+            x="806" y="32" rx="14" ry="14" width="170" height="44"
+            fill="rgba(255,215,0,0.12)" stroke="rgba(255,215,0,0.55)"
+          />
+          <text x="891" y="62" textAnchor="middle" style={{ font: '700 22px Inter', fill: 'rgba(255,215,0,0.95)' }}>
+            {badgeText}
+          </text>
+        </>
+      )}
+
+      {title && <text x={pad} y={pad + 10} style={{ font: '800 40px Inter,Segoe UI,Arial', fill: '#fff' }}>{title}</text>}
+      {addressStr && (
+        <text
+          x={pad}
+          y={pad + (title ? 52 : 50)}
+          style={{ font: '600 26px Inter,Segoe UI,Arial', fill: 'rgba(255,255,255,.9)' }}
+        >
+          {addressStr}
+        </text>
+      )}
+
+      {rows}
+    </svg>
+  )
+}
+
 export default function CardPreviewMint({
   defaultPrompt,
   title = '',
