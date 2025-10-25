@@ -1,3 +1,5 @@
+'use client'
+
 import React from 'react'
 import {
   useAccount,
@@ -15,11 +17,11 @@ const PILL_R = PILL_H / 2
 const ZERO = '0x0000000000000000000000000000000000000000' as const
 
 const TIERS = [
-  { id: 1, days: 7 },
-  { id: 2, days: 30 },
-  { id: 3, days: 90 },
-  { id: 4, days: 180 },
-  { id: 5, days: 365 },
+  { id: 1, days: 7 as const },
+  { id: 2, days: 30 as const },
+  { id: 3, days: 90 as const },
+  { id: 4, days: 180 as const },
+  { id: 5, days: 365 as const },
 ] as const
 
 const IMG_BASE = (process.env.NEXT_PUBLIC_BADGE_IMG_BASE || '/badges').replace(/\/$/, '')
@@ -38,7 +40,7 @@ export default function GmBadgeBar({ contract }: Props) {
   })
   const currentStreak = Number((userData as any)?.[1] ?? 0)
 
-  // 2) balances (batch) — بدون هوک داخل map
+  // 2) balances (batch)
   const { data: balBatch } = useReadContracts({
     contracts: TIERS.map((t) => ({
       address: contract as `0x${string}`,
@@ -48,11 +50,17 @@ export default function GmBadgeBar({ contract }: Props) {
     })),
     query: { enabled },
   })
-  const balances: number[] = (balBatch ?? []).map((r: any) => (r?.result ? Number(r.result as bigint) : 0))
+  const balances: number[] = (balBatch ?? []).map((r: any) =>
+    r?.result ? Number(r.result as bigint) : 0
+  )
 
-  // 3) تصاویر — state آرایه‌ای (fallback به .PNG در صورت نیاز)
+  // 3) images (fallback .PNG)
   const [srcs, setSrcs] = React.useState<string[]>(TIERS.map((t) => `${IMG_BASE}/${t.id}.png`))
-  React.useEffect(() => { setSrcs(TIERS.map((t) => `${IMG_BASE}/${t.id}.png`)) }, [IMG_BASE])
+  React.useEffect(() => {
+    setSrcs(TIERS.map((t) => `${IMG_BASE}/${t.id}.png`))
+    // IMG_BASE از env می‌آید و در runtime ثابت است
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const onImgError = React.useCallback(
     (i: number) => (e: React.SyntheticEvent<HTMLImageElement>) => {
@@ -71,16 +79,26 @@ export default function GmBadgeBar({ contract }: Props) {
   const { isLoading: isMining } = useWaitForTransactionReceipt({ hash })
   const onClaim = (id: number) => {
     if (!contract) return
-    writeContract({ address: contract as `0x${string}`, abi: gmStreak1155Abi, functionName: 'claimBadge', args: [BigInt(id)] })
+    writeContract({
+      address: contract as `0x${string}`,
+      abi: gmStreak1155Abi,
+      functionName: 'claimBadge',
+      args: [BigInt(id)],
+    })
   }
 
   if (!contract) return null
 
   // progress mini-bar (از مرز قبلی تا بعدی)
-  const bounds = [0, ...TIERS.map((t) => t.days)]
-  let from = 0, to = TIERS[TIERS.length - 1].days
+  const bounds: number[] = [0, ...TIERS.map((t) => t.days)]
+  let from: number = 0
+  let to: number = TIERS[TIERS.length - 1].days
   for (let i = 0; i < bounds.length - 1; i++) {
-    if (currentStreak < bounds[i + 1]) { from = bounds[i]; to = bounds[i + 1]; break }
+    if (currentStreak < bounds[i + 1]) {
+      from = bounds[i]
+      to = bounds[i + 1]
+      break
+    }
   }
   const progress = Math.max(0, Math.min(1, (currentStreak - from) / (to - from || 1)))
   const progressPct = `${(progress * 100).toFixed(1)}%`
@@ -88,12 +106,14 @@ export default function GmBadgeBar({ contract }: Props) {
   return (
     <div className="frame" role="group" aria-label="BM Badges">
       {/* mini progress */}
-      <div className="progress" aria-hidden><span style={{ width: progressPct }} /></div>
+      <div className="progress" aria-hidden>
+        <span style={{ width: progressPct }} />
+      </div>
 
       {TIERS.map((t, i) => {
         const has = (balances[i] ?? 0) > 0
         const eligible = currentStreak >= t.days && !has
-        const colorful = eligible || has // رنگی وقتی قابل کلیم یا مالکیت داریم
+        const colorful = eligible || has
 
         return (
           <button
@@ -142,40 +162,32 @@ export default function GmBadgeBar({ contract }: Props) {
           transition: width .35s ease;
         }
 
-        /* دکمه‌ی شفاف (هیچ قاب/پس‌زمینه‌ای نداره) */
         .slot {
           all: unset;
           position: relative;
-          width: 36px; height: 36px;             /* ناحیه‌ی کلیک */
+          width: 36px; height: 36px;
           display: inline-grid; place-items: center;
           cursor: default;
-          border-radius: 8px;                     /* فقط برای hit-area، دیده نمی‌شود */
+          border-radius: 8px;
           transition: transform .12s ease, filter .12s ease;
         }
         .slot.eligible { cursor: pointer; }
-        .slot:hover .img { transform: scale(1.08); }     /* بزرگ‌نمایی ملایم روی hover */
+        .slot:hover .img { transform: scale(1.08); }
 
-        /* خود تصویر بج: بدون حاشیه/پس‌زمینه */
         .img {
           width: 28px; height: 28px; object-fit: contain;
           transition: transform .12s ease, filter .12s ease, opacity .12s ease;
           filter: drop-shadow(0 1px 2px rgba(0,0,0,0.12));
           pointer-events: none;
         }
-
-        /* حالت خاموش (قابل کلیم نیست): کمی سیاه‌وسفید */
         .slot.off .img {
           filter: grayscale(.75) saturate(.6) brightness(.98) drop-shadow(0 1px 2px rgba(0,0,0,0.08));
           opacity: .85;
         }
-
-        /* حالت روشن (قابل کلیم یا مالک): رنگی کامل */
         .slot.on .img {
           filter: none drop-shadow(0 1px 2px rgba(0,0,0,0.18));
           opacity: 1;
         }
-
-        /* اگر قابل کلیم است، فقط یک هاله‌ی خیلی لطیف سبز (نه قاب) */
         .slot.eligible::after {
           content: "";
           position: absolute; inset: 2px;
