@@ -10,7 +10,10 @@ async function fetchWithTimeout(url: string, ms = 2000) {
   const ctrl = new AbortController()
   const id = setTimeout(() => ctrl.abort(), ms)
   try {
-    const r = await fetch(url, { signal: ctrl.signal, headers: { 'User-Agent': 'base-persona/1.0' } as any })
+    const r = await fetch(url, {
+      signal: ctrl.signal,
+      headers: { 'User-Agent': 'base-persona/1.0' } as any,
+    })
     if (!r.ok) throw new Error('http_' + r.status)
     return await r.json()
   } finally {
@@ -35,32 +38,33 @@ async function getFromBinance(): Promise<number | null> {
 }
 
 async function getEthUsd(): Promise<number | null> {
-  // کش 60 ثانیه
-  if (cache.usd && Date.now() - cache.at < TTL_MS) return cache.usd
+  // cache hit
+  if (cache.usd != null && Date.now() - cache.at < TTL_MS) return cache.usd
   const providers = [getFromCoinbase, getFromCoinGecko, getFromBinance]
   for (const fn of providers) {
     try {
       const v = await fn()
-      if (v && Number.isFinite(v)) {
+      if (v != null && Number.isFinite(v)) {
         cache = { usd: v, at: Date.now() }
         return v
       }
-    } catch { /* try next */ }
+    } catch {
+      // try next
+    }
   }
   return null
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse<PriceResp>) {
   try {
-    const cached = cache.usd && Date.now() - cache.at < TTL_MS
+    const cached = !!(cache.usd != null && Date.now() - cache.at < TTL_MS)
     const usd = await getEthUsd()
-    if (!usd) {
-      // شکست اما 200 بده که اسپم 500 نشه؛ فرانت خودش null رو هندل می‌کنه
+    if (usd == null) {
+      // 200 با ok=false تا فرانت هندل کند و لاگ 500 تولید نشود
       return res.status(200).json({ ok: false, usd: null, error: 'no_price' })
     }
-    res.status(200).json({ ok: true, usd, cached })
+    return res.status(200).json({ ok: true, usd, cached })
   } catch (e: any) {
-    // باز هم 200 تا لاگ 500 نگیری؛ ok=false
-    res.status(200).json({ ok: false, usd: null, error: e?.message || 'price_failed' })
+    return res.status(200).json({ ok: false, usd: null, error: e?.message || 'price_failed' })
   }
 }
