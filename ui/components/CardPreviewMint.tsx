@@ -4,17 +4,10 @@ import React, { useEffect, useState } from 'react'
 import { useAccount, useReadContract, useWriteContract } from 'wagmi'
 import { keccak256, formatEther } from 'viem'
 import { bmImage721Abi } from '../lib/abi/BMImage721'
+import { gateAbi } from '../lib/abi/gate'
 
 type Stat = { label: string; value: string }
 type GenerateArgs = { prompt: string }
-
-// -------- FeeGate (Pay to Generate) ABI --------
-const gateAbi = [
-  { type: 'function', name: 'genFeeWei', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] },
-  { type: 'function', name: 'dailyCap',  stateMutability: 'view', inputs: [], outputs: [{ type: 'uint8' }] },
-  { type: 'function', name: 'remainingToday', stateMutability: 'view', inputs: [{ type: 'address' }], outputs: [{ type: 'uint8' }] },
-  { type: 'function', name: 'payGenerate', stateMutability: 'payable', inputs: [], outputs: [] },
-] as const
 
 // ---------- Small utils ----------
 const btn = (grad: string): React.CSSProperties => ({
@@ -36,7 +29,7 @@ const btnDisabled: React.CSSProperties = { opacity: 0.5, cursor: 'not-allowed' }
 
 function safeAtob(b64: string): string {
   if (typeof window !== 'undefined' && typeof window.atob === 'function') return window.atob(b64)
-  // Node/SSR: برمی‌گردونیم رشته‌ی خالی تا کرش نکند
+  // Node/SSR fallback
   return ''
 }
 
@@ -62,7 +55,6 @@ function toBigIntSafe(x: unknown): bigint {
     if (typeof x === 'bigint') return x
     if (typeof x === 'number') return BigInt(Math.trunc(x))
     if (typeof x === 'string' && x.trim() !== '') return BigInt(x)
-    // wagmi ممکنه ساختارهایی مثل { _hex: '0x..' } بده — موارد زیر را هم هندل می‌کنیم:
     if (x && typeof x === 'object' && '_hex' in (x as any)) {
       const hex = (x as any)._hex as string
       return BigInt(hex)
@@ -79,79 +71,78 @@ function toNumberSafe(x: unknown, fallback = 0): number {
   return Number.isFinite(n) ? n : fallback
 }
 
-// ───────────── SVG Overlay
-function LiveOverlay({
-  title,
-  addressStr,
-  stats,
-  badgeText,
-  logoHref = '/base_logo.svg',
-}: {
-  title?: string
-  addressStr?: string
-  stats: Stat[]
-  badgeText?: string
-  logoHref?: string
-}) {
+// ---------- Build SVG overlay string (to be composed on server)
+function buildOverlaySVG(
+  title: string | undefined,
+  addressStr: string | undefined,
+  stats: Stat[],
+  badgeText: string | undefined,
+  logoHref: string = '/base_logo.svg'
+): string {
   const pad = 48
   const line = 44
-  const n = Math.min(6, stats.length)
-  const rows = Array.from({ length: n }).map((_, i) => {
-    const y = 1024 - pad - 20 - (n - 1 - i) * line
-    const s = stats[i]
-    return (
-      <text key={i} x={pad} y={y} style={{ font: '500 28px Inter,Segoe UI,Arial', fill: 'rgba(255,255,255,.95)' }}>
-        {s.label}: <tspan style={{ fontWeight: 700 }}>{s.value}</tspan>
-      </text>
-    )
-  })
+  const max = Math.min(6, stats.length)
 
-  return (
-    <svg viewBox="0 0 1024 1024" preserveAspectRatio="none" width="100%" height="100%">
-      <defs>
-        <linearGradient id="topFade" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="rgba(0,0,0,.55)" />
-          <stop offset="60%" stopColor="rgba(0,0,0,0)" />
-        </linearGradient>
-        <linearGradient id="bottomFade" x1="0" y1="1" x2="0" y2="0">
-          <stop offset="0%" stopColor="rgba(0,0,0,.50)" />
-          <stop offset="55%" stopColor="rgba(0,0,0,0)" />
-        </linearGradient>
-      </defs>
+  const rows = Array.from({ length: max })
+    .map((_, i) => {
+      const y = 1024 - pad - 20 - (max - 1 - i) * line
+      const s = stats[i]
+      return `
+        <text x="${pad}" y="${y}" style="font:500 28px Inter,Segoe UI,Arial; fill: rgba(255,255,255,.95)">
+          ${escapeXml(s.label)}:
+          <tspan style="font-weight:700">${escapeXml(s.value)}</tspan>
+        </text>`
+    })
+    .join('\n')
 
-      <rect width="1024" height="430" fill="url(#topFade)" />
-      <rect y="594" width="1024" height="430" fill="url(#bottomFade)" />
+  const badge = badgeText
+    ? `
+    <rect x="806" y="32" rx="14" ry="14" width="170" height="44"
+      fill="rgba(255,215,0,0.12)" stroke="rgba(255,215,0,0.55)"/>
+    <text x="891" y="62" text-anchor="middle" style="font:700 22px Inter; fill: rgba(255,215,0,0.95)">
+      ${escapeXml(badgeText)}
+    </text>`
+    : ''
 
-      {/* Base logo */}
-      <image href={logoHref} x="904" y="32" width="88" height="88" />
+  const titleEl = title
+    ? `<text x="${pad}" y="${pad + 10}" style="font:800 40px Inter,Segoe UI,Arial; fill:#fff">${escapeXml(title)}</text>`
+    : ''
 
-      {/* Badge */}
-      {badgeText && (
-        <>
-          <rect
-            x="806" y="32" rx="14" ry="14" width="170" height="44"
-            fill="rgba(255,215,0,0.12)" stroke="rgba(255,215,0,0.55)"
-          />
-          <text x="891" y="62" textAnchor="middle" style={{ font: '700 22px Inter', fill: 'rgba(255,215,0,0.95)' }}>
-            {badgeText}
-          </text>
-        </>
-      )}
+  const addrEl = addressStr
+    ? `<text x="${pad}" y="${pad + (title ? 52 : 50)}" style="font:600 26px Inter,Segoe UI,Arial; fill:rgba(255,255,255,.9)">${escapeAddress(addressStr)}</text>`
+    : ''
 
-      {title && <text x={pad} y={pad + 10} style={{ font: '800 40px Inter,Segoe UI,Arial', fill: '#fff' }}>{title}</text>}
-      {addressStr && (
-        <text
-          x={pad}
-          y={pad + (title ? 52 : 50)}
-          style={{ font: '600 26px Inter,Segoe UI,Arial', fill: 'rgba(255,255,255,.9)' }}
-        >
-          {addressStr}
-        </text>
-      )}
+  return `
+<svg viewBox="0 0 1024 1024" preserveAspectRatio="none" width="1024" height="1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="topFade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="rgba(0,0,0,.55)" />
+      <stop offset="60%" stop-color="rgba(0,0,0,0)" />
+    </linearGradient>
+    <linearGradient id="bottomFade" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0%" stop-color="rgba(0,0,0,.50)" />
+      <stop offset="55%" stop-color="rgba(0,0,0,0)" />
+    </linearGradient>
+  </defs>
 
-      {rows}
-    </svg>
-  )
+  <rect width="1024" height="430" fill="url(#topFade)" />
+  <rect y="594" width="1024" height="430" fill="url(#bottomFade)" />
+
+  <image href="${logoHref}" x="904" y="32" width="88" height="88" />
+
+  ${badge}
+  ${titleEl}
+  ${addrEl}
+  ${rows}
+</svg>`.trim()
+}
+
+function escapeXml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+function escapeAddress(s: string): string {
+  // keep ellipsis visually; escape only XML special chars
+  return escapeXml(s)
 }
 
 export default function CardPreviewMint({
@@ -215,8 +206,9 @@ export default function CardPreviewMint({
   const { writeContractAsync } = useWriteContract()
 
   const [baseImg, setBaseImg] = useState<string | null>(null)
-  const [cardImg, setCardImg] = useState<string | null>(null)
-  const [cardHash, setCardHash] = useState<string | null>(null)
+  const [cardImg, setCardImg] = useState<string | null>(null)   // gateway URL (https://...) after compose-store
+  const [cardHash, setCardHash] = useState<string | null>(null) // 0x... sha256 from server
+  const [tokenUri, setTokenUri] = useState<string | null>(null) // ipfs://... metadata
   const [busy, setBusy] = useState<{ gen?: boolean; compose?: boolean; mint?: boolean; paying?: boolean }>({})
   const [error, setError] = useState<string | null>(null)
   const [payTx, setPayTx] = useState<string | null>(null)
@@ -262,9 +254,9 @@ export default function CardPreviewMint({
     throw new Error(`API ${r.status} ${ct}: ${text.slice(0, 180)}`)
   }
 
-  function downloadDataURL(dataUrl: string, filename: string) {
+  function downloadFile(url: string, filename: string) {
     const a = document.createElement('a')
-    a.href = dataUrl
+    a.href = url
     a.download = filename
     document.body.appendChild(a)
     a.click()
@@ -318,7 +310,7 @@ export default function CardPreviewMint({
       })
       const j = await parseJsonOrText(r)
       if (!j?.ok) throw new Error(j?.error || 'image_failed')
-      setBaseImg(j.imageURL); setCardImg(null); setCardHash(null); setMintTx(null)
+      setBaseImg(j.imageURL); setCardImg(null); setCardHash(null); setTokenUri(null); setMintTx(null)
     } catch (e: any) {
       setError(String(e?.message || e))
     } finally {
@@ -326,63 +318,87 @@ export default function CardPreviewMint({
     }
   }
 
+  // --- Compose → Store(IPFS) ---
   async function composeCard() {
-    if (!baseImg) return
+    if (!baseImg || !address) { setError('Generate first (and connect wallet).'); return }
     setBusy(b => ({ ...b, compose: true })); setError(null)
     try {
-      const r = await fetch('/api/card/compose', {
-        method: 'POST', headers: { 'content-type': 'application/json' },
+      const svg = buildOverlaySVG(
+        title,
+        subtitle || (address ? `${address.slice(0,6)}…${address.slice(-4)}` : ''),
+        stats,
+        badgeText,
+        logoHref
+      )
+
+      const r = await fetch('/api/compose-store', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          imageURL: baseImg,
-          title,
-          subtitle: subtitle || (address ? `${address.slice(0,6)}…${address.slice(-4)}` : ''),
-          stats, badgeText, logoUrl: logoHref,
+          from: address,
+          baseImage: baseImg,   // data:/http(s)/ipfs://
+          overlaySVG: svg,      // SVG string
+          name: 'MegaPersona Card',
+          description: 'Deterministic persona generated from on-chain activity.',
+          attributes: stats.map(s => ({ trait_type: s.label, value: s.value })),
+          external_url: window.location.origin + `/nft/${address}`,
         }),
       })
       const j = await parseJsonOrText(r)
       if (!j?.ok) throw new Error(j?.error || 'compose_failed')
-      setCardImg(j.imageURL); setCardHash(j.imageKeccak || null)
-    } catch (e: any) { setError(String(e?.message || e)) }
-    finally { setBusy(b => ({ ...b, compose: false })) }
+
+      // server returns { image: { gateway }, tokenUri, imageHash }
+      setCardImg(j.image?.gateway || null)
+      setCardHash(j.imageHash || null)
+      setTokenUri(j.tokenUri || null)
+      setMintTx(null)
+    } catch (e: any) {
+      setError(String(e?.message || e))
+    } finally {
+      setBusy(b => ({ ...b, compose: false }))
+    }
   }
 
+  // --- Sign → Claim ---
   async function uploadSignMint() {
-    if (!cardImg) { setError('Compose card first'); return }
+    if (!cardImg || !tokenUri) { setError('Compose card first'); return }
+    if (!address) { setError('Connect wallet first'); return }
+
     setBusy(b => ({ ...b, mint: true })); setError(null)
     try {
-      // 1) Upload metadata
-      const up = await fetch('/api/card/upload', {
-        method:'POST', headers:{'content-type':'application/json'},
-        body: JSON.stringify({
-          cardPngDataURL: cardImg,
-          name: 'MegaPersona Card',
-          description: 'Deterministic persona generated from on-chain activity.',
-          attributes: stats.map(s=>({ trait_type: s.label, value: s.value })),
-          properties: { prompt: defaultPrompt }
-        })
-      }).then(parseJsonOrText)
-      if (!up?.ok) throw new Error(up?.error || 'upload_failed')
-      const tokenURI = up.tokenURI as string
-
-      // 2) Sign EIP-712 Claim
-      if (!address) throw new Error('connect wallet first')
+      // 1) deadline + nonce
       const deadline = Math.floor(Date.now()/1000) + 3600
       const nonce = Number(nextNonce || 0)
-      const imageHash = cardHash || keccak256(dataUrlBytes(cardImg))
+
+      // imageHash از compose-store آمده؛ اگر نبود، fallback keccak از dataURL
+      let imageHash = cardHash
+      if (!imageHash && cardImg.startsWith('data:')) {
+        imageHash = keccak256(dataUrlBytes(cardImg))
+      }
+      if (!imageHash) throw new Error('missing image hash')
+
+      // 2) امضا
       const sc = await fetch('/api/sign-claim', {
         method:'POST', headers:{'content-type':'application/json'},
-        body: JSON.stringify({ to: address, tokenURI, imageHash, deadline, nonce })
+        body: JSON.stringify({ to: address, tokenURI: tokenUri, imageHash, deadline, nonce })
       }).then(parseJsonOrText)
       if (!sc?.sig) throw new Error(sc?.error || 'sign_claim_failed')
 
-      // 3) Contract mint
+      // 3) value (اگر payable باشد)
       const value = toBigIntSafe(mintFeeWei)
-      const args = [ { to: address, tokenURI, imageHash, deadline, nonce }, sc.sig ] as any
-      const txHash = await writeContractAsync({ address: CONTRACT, abi: bmImage721Abi as any, functionName: 'claim', args, value })
+
+      // 4) claim
+      const args = [ { to: address, tokenURI: tokenUri, imageHash, deadline, nonce }, sc.sig ] as any
+      const txHash = await writeContractAsync({
+        address: CONTRACT, abi: bmImage721Abi as any, functionName: 'claim', args, value
+      })
       setMintTx(String(txHash))
       if (typeof window !== 'undefined') window.alert('Mint tx sent: ' + txHash)
-    } catch(e:any) { setError(String(e?.message || e)) }
-    finally { setBusy(b=>({ ...b, mint:false })) }
+    } catch(e:any) {
+      setError(String(e?.message || e))
+    } finally {
+      setBusy(b=>({ ...b, mint:false }))
+    }
   }
 
   // ---------- Small helpers for UI ----------
@@ -445,7 +461,7 @@ export default function CardPreviewMint({
         <Frame title="Mint" value={<>{mintFeeEth || '—'} ETH</>} />
         <Frame title="Quota" value={quotaStr} />
         {mintTx && cardImg
-          ? <Frame title="Download" value="" canButton onClick={()=>downloadDataURL(cardImg!, 'persona_card.png')} />
+          ? <Frame title="Download" value="" canButton onClick={()=>downloadFile(cardImg!, 'persona_card.png')} />
           : <Frame title="Download" value="—" />}
       </div>
 
