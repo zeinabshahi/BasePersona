@@ -38,7 +38,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     const domain = {
       name: 'ActivityPersona',
       version: '1',
-      chainId: Number(process.env.NEXT_PUBLIC_CHAIN_ID || 84532),
+      chainId: Number(process.env.NEXT_PUBLIC_CHAIN_ID || 8453),
       verifyingContract: process.env.NEXT_PUBLIC_CONTRACT as `0x${string}`,
     };
     const types = {
