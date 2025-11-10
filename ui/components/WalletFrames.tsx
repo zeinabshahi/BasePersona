@@ -101,7 +101,7 @@ export default function WalletFrames({ address }:{ address:string }) {
   // سِلکشن سراسری ماه + بازه
   const [sel,setSel]=React.useState(0)
   const [range,setRange]=React.useState<[number,number]|null>(null)
-  const [preset,setPreset]=React.useState<'last6'|'last12'|'all'>('last12')
+  const [preset,setPreset]=React.useState<'all'>('all')
 
   React.useEffect(()=>{
     let off=false
@@ -116,7 +116,7 @@ export default function WalletFrames({ address }:{ address:string }) {
           setData(j)
           const last=j.monthly.length-1
           setSel(last)
-          const start=Math.max(0, j.monthly.length-12)
+          const start = 0
           setRange([start,last])
           setPreset('last12')
         }
@@ -130,7 +130,7 @@ export default function WalletFrames({ address }:{ address:string }) {
 
   const months = data.monthly
   const [r0,r1] = range ?? [0, months.length-1]
-  const view = months.slice(r0, r1+1)
+  const view = months.slice(0, months.length)
   const selLocal = Math.min(Math.max(sel-r0,0), view.length-1)
 
   const cur = months[sel] || {}
