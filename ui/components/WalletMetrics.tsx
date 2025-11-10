@@ -40,7 +40,6 @@ type Summary = {
     volume?: Rank
     overall?: { score:number; rank:number; pct:number }
   } | null
-  // unique_tokens_traded_all?: number   // ← دیگر استفاده نمی‌کنیم
 }
 type Payload = { summary: Summary; monthly: Monthly[] }
 
@@ -101,7 +100,7 @@ export default function WalletFrames({ address }:{ address:string }) {
   // سِلکشن سراسری ماه + بازه
   const [sel,setSel]=React.useState(0)
   const [range,setRange]=React.useState<[number,number]|null>(null)
-  const [preset,setPreset]=React.useState<'all'>('all')
+  const [preset,setPreset]=React.useState<'all'|'last6'|'last12'>('all')
 
   React.useEffect(()=>{
     let off=false
@@ -127,25 +126,6 @@ export default function WalletFrames({ address }:{ address:string }) {
   },[address])
 
   if(!data) return err? <div className={css.error}>Error: {err}</div> : null
-
-  // If all monthly entries have zeroed metrics, do not render the frames to avoid showing misleading zeros.
-  const hasAnyData = data?.monthly?.some((m) => {
-    return (
-      Number(m.avg_balance_eth ?? 0) !== 0 ||
-      Number(m.volume_usd ?? 0) !== 0 ||
-      Number(m.native_txs ?? 0) !== 0 ||
-      Number(m.token_txs ?? 0) !== 0 ||
-      Number(m.uniq_contracts ?? 0) !== 0 ||
-      Number(m.nft_unique_contracts ?? 0) !== 0 ||
-      Number(m.uniq_days ?? 0) !== 0 ||
-      Number(m.tokens_traded_unique ?? 0) !== 0 ||
-      Number(m.gas_spent_eth ?? 0) !== 0
-    )
-  })
-  if (!hasAnyData) {
-    // render nothing when there is no meaningful data for the wallet
-    return null
-  }
 
   const months = data.monthly
   const [r0,r1] = range ?? [0, months.length-1]
@@ -194,6 +174,9 @@ export default function WalletFrames({ address }:{ address:string }) {
   }
   function setLocal(i:number){ setSel(r0 + i) }
 
+  // Helper: اگر کل سری صفر باشد، فریم را مخفی کن
+  const hasAny = (arr:number[]) => arr.some(v => Number(v) !== 0)
+
   return (
     <div className={css.wrap}>
       {/* ── نوار بالا: فقط یک‌بار برای همهٔ فریم‌ها ── */}
@@ -205,94 +188,115 @@ export default function WalletFrames({ address }:{ address:string }) {
         </div>
         <div className={css.selMonth}>Month: <strong>{months[sel]?.month || '—'}</strong></div>
         <div className={css.streaks}>
-          {/* Removed the streak display; only show bucket if present */}
-          {data.summary?.cum_ranks?.balance?.bucket && <span className={css.badge}>Bucket: {data.summary.cum_ranks.balance.bucket}</span>}
-          {/* Unique tokens (all) حذف شد */}
+          {(data.summary?.current_streak_months ?? 0) > 0 && (
+            <span className={css.badge}>Streak: {data.summary!.current_streak_months}</span>
+          )}
+          {data.summary?.cum_ranks?.balance?.bucket && (
+            <span className={css.badge}>Bucket: {data.summary.cum_ranks.balance.bucket}</span>
+          )}
         </div>
       </div>
 
       {/* GRID: ۹ فریم (۳×۳) */}
       <div className={css.grid}>
         {/* Row 1: Balance / Volume / Interactions */}
-        <div className={css.card}>
-          <div className={css.head}><div className={css.title}>Balance (ETH)</div><div className={css.rank}>{cur?.ranks?.balance?.rank ? `Rank #${cur.ranks.balance.rank}` : '—'}</div></div>
-          <div className={css.row}><div className={css.big}>{fmt(cur?.avg_balance_eth,3)}</div><div className={css.sub}>on-chain (avg)</div><div className={css.delta}><Arrow s={dBal.sign}/> {dBal.diff==null?'—':fmt(dBal.diff,3)} <span className={css.muted}>({dBal.pct==null?'—':fmt(dBal.pct,1)+'%'})</span></div></div>
-          <Spark series={sBalEth} labels={labels} selected={selLocal} onSelect={setLocal} color="rgb(34,197,94)"/>
-        </div>
+        {hasAny(sBalEth) && (
+          <div className={css.card}>
+            <div className={css.head}><div className={css.title}>Balance (ETH)</div><div className={css.rank}>{cur?.ranks?.balance?.rank ? `Rank #${cur.ranks.balance.rank}` : '—'}</div></div>
+            <div className={css.row}><div className={css.big}>{fmt(cur?.avg_balance_eth,3)}</div><div className={css.sub}>on-chain (avg)</div><div className={css.delta}><Arrow s={dBal.sign}/> {dBal.diff==null?'—':fmt(dBal.diff,3)} <span className={css.muted}>({dBal.pct==null?'—':fmt(dBal.pct,1)+'%'})</span></div></div>
+            <Spark series={sBalEth} labels={labels} selected={selLocal} onSelect={setLocal} color="rgb(34,197,94)"/>
+          </div>
+        )}
 
-        <div className={css.card}>
-          <div className={css.head}><div className={css.title}>Volume (USD)</div><div className={css.rank}>{cur?.ranks?.volume?.rank ? `Rank #${cur.ranks.volume.rank}` : '—'}</div></div>
-          <div className={css.row}><div className={css.big}>${fmt(cur?.volume_usd,2)}</div><div className={css.sub}>swap + bridge</div><div className={css.delta}><Arrow s={dVol.sign}/> {dVol.diff==null?'—':`$${fmt(dVol.diff,2)}`} <span className={css.muted}>({dVol.pct==null?'—':fmt(dVol.pct,1)+'%'})</span></div></div>
-          <Spark series={sVolUsd} labels={labels} selected={selLocal} onSelect={setLocal} color="rgb(59,130,246)"/>
-        </div>
+        {hasAny(sVolUsd) && (
+          <div className={css.card}>
+            <div className={css.head}><div className={css.title}>Volume (USD)</div><div className={css.rank}>{cur?.ranks?.volume?.rank ? `Rank #${cur.ranks.volume.rank}` : '—'}</div></div>
+            <div className={css.row}><div className={css.big}>${fmt(cur?.volume_usd,2)}</div><div className={css.sub}>swap + bridge</div><div className={css.delta}><Arrow s={dVol.sign}/> {dVol.diff==null?'—':`$${fmt(dVol.diff,2)}`} <span className={css.muted}>({dVol.pct==null?'—':fmt(dVol.pct,1)+'%'})</span></div></div>
+            <Spark series={sVolUsd} labels={labels} selected={selLocal} onSelect={setLocal} color="rgb(59,130,246)"/>
+          </div>
+        )}
 
-        <div className={css.card}>
-          <div className={css.head}><div className={css.title}>Interactions</div><div className={css.rank}>{cur?.ranks?.activity?.rank ? `Rank #${cur.ranks.activity.rank}` : '—'}</div></div>
-          <div className={css.row}><div className={css.big}>{(cur?.native_txs||0)+(cur?.token_txs||0)+(cur?.nft_unique_contracts||0)+(cur?.uniq_contracts||0)}</div><div className={css.sub}>total</div><div className={css.delta}><Arrow s={dInt.sign}/> {dInt.diff==null?'—':String(dInt.diff)} <span className={css.muted}>({dInt.pct==null?'—':fmt(dInt.pct,1)+'%'})</span></div></div>
-          <Spark series={sInter} labels={labels} selected={selLocal} onSelect={setLocal} color="rgb(2,132,199)"/>
-        </div>
+        {hasAny(sInter) && (
+          <div className={css.card}>
+            <div className={css.head}><div className={css.title}>Interactions</div><div className={css.rank}>{cur?.ranks?.activity?.rank ? `Rank #${cur.ranks.activity.rank}` : '—'}</div></div>
+            <div className={css.row}><div className={css.big}>{(cur?.native_txs||0)+(cur?.token_txs||0)+(cur?.nft_unique_contracts||0)+(cur?.uniq_contracts||0)}</div><div className={css.sub}>total</div><div className={css.delta}><Arrow s={dInt.sign}/> {dInt.diff==null?'—':String(dInt.diff)} <span className={css.muted}>({dInt.pct==null?'—':fmt(dInt.pct,1)+'%'})</span></div></div>
+            <Spark series={sInter} labels={labels} selected={selLocal} onSelect={setLocal} color="rgb(2,132,199)"/>
+          </div>
+        )}
 
         {/* Row 2: Activity / NFT Holders / Time & engagement */}
-        <div className={css.card}>
-          <div className={css.head}><div className={css.title}>Activity</div><div className={css.rank}>{cur?.ranks?.activity?.rank ? `Rank #${cur.ranks.activity.rank}` : '—'}</div></div>
-          <div className={css.kpis}>
-            <div className={css.kpi}><div className={css.kv}>{cur?.native_txs ?? 0}</div><div className={css.kk}>Native TXs</div></div>
-            <div className={css.kpi}><div className={css.kv}>{cur?.token_txs ?? 0}</div><div className={css.kk}>Token TXs</div></div>
-            <div className={css.kpi}><div className={css.kv}>{cur?.uniq_contracts ?? 0}</div><div className={css.kk}>Unique Contracts</div></div>
+        {hasAny(sAct) && (
+          <div className={css.card}>
+            <div className={css.head}><div className={css.title}>Activity</div><div className={css.rank}>{cur?.ranks?.activity?.rank ? `Rank #${cur.ranks.activity.rank}` : '—'}</div></div>
+            <div className={css.kpis}>
+              <div className={css.kpi}><div className={css.kv}>{cur?.native_txs ?? 0}</div><div className={css.kk}>Native TXs</div></div>
+              <div className={css.kpi}><div className={css.kv}>{cur?.token_txs ?? 0}</div><div className={css.kk}>Token TXs</div></div>
+              <div className={css.kpi}><div className={css.kv}>{cur?.uniq_contracts ?? 0}</div><div className={css.kk}>Unique Contracts</div></div>
+            </div>
+            <div className={css.delta}><Arrow s={dAct.sign}/> {dAct.diff==null?'—':String(dAct.diff)} <span className={css.muted}>({dAct.pct==null?'—':fmt(dAct.pct,1)+'%'})</span></div>
+            <Spark series={sAct} labels={labels} selected={selLocal} onSelect={setLocal} color="rgb(234,179,8)"/>
           </div>
-          <div className={css.delta}><Arrow s={dAct.sign}/> {dAct.diff==null?'—':String(dAct.diff)} <span className={css.muted}>({dAct.pct==null?'—':fmt(dAct.pct,1)+'%'})</span></div>
-          <Spark series={sAct} labels={labels} selected={selLocal} onSelect={setLocal} color="rgb(234,179,8)"/>
-        </div>
+        )}
 
-        <div className={css.card}>
-          <div className={css.head}><div className={css.title}>NFT Holders</div><div className={css.rank}>{cur?.ranks?.nft?.rank ? `Rank #${cur.ranks.nft.rank}` : '—'}</div></div>
-          <div className={css.badgeRow}>
-            <span className={cur?.nft_holds_builder?css.badgeOn:css.badgeOff}>Base Builder {cur?.nft_holds_builder? 'Yes':'No'}</span>
-            <span className={cur?.nft_holds_introduced?css.badgeOn:css.badgeOff}>Base Introduced {cur?.nft_holds_introduced? 'Yes':'No'}</span>
+        {hasAny(sNftCnt) && (
+          <div className={css.card}>
+            <div className={css.head}><div className={css.title}>NFT Holders</div><div className={css.rank}>{cur?.ranks?.nft?.rank ? `Rank #${cur.ranks.nft.rank}` : '—'}</div></div>
+            <div className={css.badgeRow}>
+              <span className={cur?.nft_holds_builder?css.badgeOn:css.badgeOff}>Base Builder {cur?.nft_holds_builder? 'Yes':'No'}</span>
+              <span className={cur?.nft_holds_introduced?css.badgeOn:css.badgeOff}>Base Introduced {cur?.nft_holds_introduced? 'Yes':'No'}</span>
+            </div>
+            <div className={css.row}><div className={css.big}>{cur?.nft_unique_contracts ?? '—'}</div><div className={css.sub}>NFT contracts</div><div className={css.delta}><Arrow s={dNft.sign}/> {dNft.diff==null?'—':String(dNft.diff)} <span className={css.muted}>({dNft.pct==null?'—':fmt(dNft.pct,1)+'%'})</span></div></div>
+            <Spark series={sNftCnt} labels={labels} selected={selLocal} onSelect={setLocal} color="rgb(99,102,241)"/>
           </div>
-          <div className={css.row}><div className={css.big}>{cur?.nft_unique_contracts ?? '—'}</div><div className={css.sub}>NFT contracts</div><div className={css.delta}><Arrow s={dNft.sign}/> {dNft.diff==null?'—':String(dNft.diff)} <span className={css.muted}>({dNft.pct==null?'—':fmt(dNft.pct,1)+'%'})</span></div></div>
-          <Spark series={sNftCnt} labels={labels} selected={selLocal} onSelect={setLocal} color="rgb(99,102,241)"/>
-        </div>
+        )}
 
-        <div className={css.card}>
-          <div className={css.head}><div className={css.title}>Time & engagement</div><div className={css.rank}>—</div></div>
-          <div className={css.kpis}>
-            <div className={css.kpi}><div className={css.kv}>{data.summary?.wallet_age_days ?? '—'}</div><div className={css.kk}>Wallet age (days)</div></div>
-            <div className={css.kpi}><div className={css.kv}>{cur?.uniq_days ?? 0}</div><div className={css.kk}>Unique days</div></div>
-            <div className={css.kpi}><div className={css.kv}>{cur?.uniq_weeks ?? 0}</div><div className={css.kk}>Unique weeks</div></div>
+        {hasAny(sDays) && (
+          <div className={css.card}>
+            <div className={css.head}><div className={css.title}>Time & engagement</div><div className={css.rank}>—</div></div>
+            <div className={css.kpis}>
+              <div className={css.kpi}><div className={css.kv}>{data.summary?.wallet_age_days ?? '—'}</div><div className={css.kk}>Wallet age (days)</div></div>
+              <div className={css.kpi}><div className={css.kv}>{cur?.uniq_days ?? 0}</div><div className={css.kk}>Unique days</div></div>
+              <div className={css.kpi}><div className={css.kv}>{cur?.uniq_weeks ?? 0}</div><div className={css.kk}>Unique weeks</div></div>
+            </div>
+            <div className={css.delta}><Arrow s={dDays.sign}/> {dDays.diff==null?'—':String(dDays.diff)} <span className={css.muted}>({dDays.pct==null?'—':fmt(dDays.pct,1)+'%'})</span></div>
+            <Spark series={sDays} labels={labels} selected={selLocal} onSelect={setLocal} color="rgb(147,51,234)"/>
           </div>
-          <div className={css.delta}><Arrow s={dDays.sign}/> {dDays.diff==null?'—':String(dDays.diff)} <span className={css.muted}>({dDays.pct==null?'—':fmt(dDays.pct,1)+'%'})</span></div>
-          <Spark series={sDays} labels={labels} selected={selLocal} onSelect={setLocal} color="rgb(147,51,234)"/>
-        </div>
+        )}
 
         {/* Row 3: Unique Tokens / Overall Ranking / Gas Paid */}
-        <div className={css.card}>
-          <div className={css.head}><div className={css.title}>Unique Tokens Traded</div><div className={css.rank}>—</div></div>
-          <div className={css.row}><div className={css.big}>{cur?.tokens_traded_unique ?? 0}</div><div className={css.sub}>this month</div><div className={css.delta}><Arrow s={dTokU.sign}/> {dTokU.diff==null?'—':String(dTokU.diff)} <span className={css.muted}>({dTokU.pct==null?'—':fmt(dTokU.pct,1)+'%'})</span></div></div>
-          <Spark series={sTokU} labels={labels} selected={selLocal} onSelect={setLocal} color="rgb(20,184,166)"/>
-        </div>
-
-        <div className={css.card}>
-          <div className={css.head}><div className={css.title}>Overall Ranking</div><div className={css.rank}>{rankCur ? `Rank #${rankCur}` : '—'}</div></div>
-          <div className={css.row}>
-            <div className={css.big}>{rankCur ?? '—'}</div>
-            <div className={css.sub}>better is lower</div>
-            <div className={css.delta}><Arrow s={dRank.sign}/> {dRank.diff==null?'—':(dRank.diff>0?`+${dRank.diff}`:`${dRank.diff}`)} <span className={css.muted}>{cur?.ranks?.overall?.score!=null ? `(score ${fmt(cur.ranks.overall.score,2)})` : ''}</span></div>
+        {hasAny(sTokU) && (
+          <div className={css.card}>
+            <div className={css.head}><div className={css.title}>Unique Tokens Traded</div><div className={css.rank}>—</div></div>
+            <div className={css.row}><div className={css.big}>{cur?.tokens_traded_unique ?? 0}</div><div className={css.sub}>this month</div><div className={css.delta}><Arrow s={dTokU.sign}/> {dTokU.diff==null?'—':String(dTokU.diff)} <span className={css.muted}>({dTokU.pct==null?'—':fmt(dTokU.pct,1)+'%'})</span></div></div>
+            <Spark series={sTokU} labels={labels} selected={selLocal} onSelect={setLocal} color="rgb(20,184,166)"/>
           </div>
-          <Spark series={sOvScore} labels={labels} selected={selLocal} onSelect={setLocal} color="rgb(107,114,128)"/>
-        </div>
+        )}
 
-        <div className={css.card}>
-          <div className={css.head}><div className={css.title}>Gas Paid (ETH)</div><div className={css.rank}>—</div></div>
-          <div className={css.row}>
-            <div className={css.big}>{fmt(cur?.gas_spent_eth,4)}</div>
-            <div className={css.sub}>this month</div>
-            <div className={css.delta}>
-              {(() => { const d=delta(cur.gas_spent_eth, prev.gas_spent_eth); return (<><Arrow s={d.sign}/> {d.diff==null?'—':fmt(d.diff,4)} <span className={css.muted}>{d.pct==null?'':`(${fmt(d.pct,1)}%)`}</span></>) })()}
+        {hasAny(sOvScore) && (
+          <div className={css.card}>
+            <div className={css.head}><div className={css.title}>Overall Ranking</div><div className={css.rank}>{rankCur ? `Rank #${rankCur}` : '—'}</div></div>
+            <div className={css.row}>
+              <div className={css.big}>{rankCur ?? '—'}</div>
+              <div className={css.sub}>better is lower</div>
+              <div className={css.delta}><Arrow s={dRank.sign}/> {dRank.diff==null?'—':(dRank.diff>0?`+${dRank.diff}`:`${dRank.diff}`)} <span className={css.muted}>{cur?.ranks?.overall?.score!=null ? `(score ${fmt(cur.ranks.overall.score,2)})` : ''}</span></div>
             </div>
+            <Spark series={sOvScore} labels={labels} selected={selLocal} onSelect={setLocal} color="rgb(107,114,128)"/>
           </div>
-          <Spark series={sGas} labels={labels} selected={selLocal} onSelect={setLocal} color="rgb(244,63,94)"/>
-        </div>
+        )}
+
+        {hasAny(sGas) && (
+          <div className={css.card}>
+            <div className={css.head}><div className={css.title}>Gas Paid (ETH)</div><div className={css.rank}>—</div></div>
+            <div className={css.row}>
+              <div className={css.big}>{fmt(cur?.gas_spent_eth,4)}</div>
+              <div className={css.sub}>this month</div>
+              <div className={css.delta}>
+                {(() => { const d=delta(cur.gas_spent_eth, prev.gas_spent_eth); return (<><Arrow s={d.sign}/> {d.diff==null?'—':fmt(d.diff,4)} <span className={css.muted}>{d.pct==null?'':`(${fmt(d.pct,1)}%)`}</span></>) })()}
+              </div>
+            </div>
+            <Spark series={sGas} labels={labels} selected={selLocal} onSelect={setLocal} color="rgb(244,63,94)"/>
+          </div>
+        )}
       </div>
     </div>
   )
