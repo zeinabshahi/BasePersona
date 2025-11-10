@@ -17,10 +17,10 @@ type MonthOpt = { ym: number; label: string }
 
 /* ------- types for WalletMetrics dynamic import ------- */
 type WalletMetricsProps = {
-  address: string;                                // must be string (never undefined)
-  selectedYm: number | null;
-  onMonthsLoaded: (list: MonthOpt[]) => void;
-  onSelectionChange: (ym: number) => void;
+  address: string
+  selectedYm: number | null
+  onMonthsLoaded: (list: MonthOpt[]) => void
+  onSelectionChange: (ym: number) => void
 }
 
 /* Use generic to keep props type-safe */
@@ -92,7 +92,7 @@ type WalletDocCDN = {
 
 function adaptDocToStats(doc: WalletDocCDN): WalletStatRecord {
   const monthsArr = Object.keys(doc.months || {}).sort()
-  const volumeETH = 0 // not present in doc; keep 0 for now
+  const volumeETH = 0
   const uniqueDays = monthsArr.reduce((acc, ym) => acc + (doc.months[ym]?.days ?? 0), 0)
   const uniqueNftContractCount = monthsArr.reduce((acc, ym) => acc + (doc.months[ym]?.nft ?? 0), 0)
   const uniqueContracts = monthsArr.reduce((acc, ym) => acc + (doc.months[ym]?.uniq ?? 0), 0)
@@ -135,7 +135,7 @@ function buildRandomNarrative(stats?: WalletStatRecord) {
 export default function Page() {
   const { address: connectedAddress, isConnected } = useAccount()
 
-  const [address, setAddress] = useState<string>('')            // always a string
+  const [address, setAddress] = useState<string>('') // always string
   const [walletStats, setWalletStats] = useState<WalletStatRecord | null>(null)
   const [persona, setPersona] = useState<any>(null)
   const [narrative, setNarrative] = useState<any>(null)
@@ -267,7 +267,7 @@ export default function Page() {
             {/* Metrics */}
             {mounted && (
               <WalletMetricsComp
-                address={address || ''}                               {/* << fix: always string */}
+                address={address || ''}
                 selectedYm={selectedYm}
                 onMonthsLoaded={(list: MonthOpt[]) => setMonthOptions(list)}
                 onSelectionChange={(ym: number) => setSelectedYm(ym)}
