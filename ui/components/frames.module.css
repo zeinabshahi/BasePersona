@@ -99,3 +99,11 @@
 .deltaUp{color:#16a34a}
 .deltaDown{color:#ef4444}
 .deltaFlat{color:#9ca3af}
+
+.up   { color: #16a34a; font-weight:600; }
+.down { color: #dc2626; font-weight:600; }
+.flat { color: #6b7280; }
+.dot  { opacity:.75 }
+.dotSel { r:4; filter: drop-shadow(0 0 2px rgba(0,0,0,.25)); }
+.spark { width:100%; height:120px; }
+.sparkWrap { padding: 0 6px; }
