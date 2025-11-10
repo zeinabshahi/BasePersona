@@ -1,8 +1,6 @@
-
 import type { NextApiRequest, NextApiResponse } from 'next'
-import fs from 'fs'
-import path from 'path'
 
+type Rank = { rank:number; pct:number; score?:number }
 type Monthly = {
   month: string
   ym: number
@@ -21,158 +19,90 @@ type Monthly = {
   nft_holds_introduced?: number
   tokens_traded_unique?: number
   gas_spent_eth?: number
-  ranks?: {
-    balance?: { rank:number; pct:number }
-    volume?: { rank:number; pct:number }
-    activity?: { rank:number; pct:number }
-    nft?: { rank:number; pct:number }
-    overall?: { rank:number; pct:number; score?:number }
+  ranks?: { balance?: Rank; volume?: Rank; activity?: Rank; nft?: Rank; overall?: Rank } | null
+}
+type Summary = {
+  current_streak_months?: number
+  best_streak_months?: number
+  active_months_total?: number
+  wallet_age_days?: number
+  cum_ranks?: {
+    balance?: { rank:number; pct:number; bucket?:string }
+    activity?: Rank
+    volume?: Rank
+    overall?: { score:number; rank:number; pct:number }
   } | null
 }
-type Payload = {
-  summary: {
-    current_streak_months?: number
-    best_streak_months?: number
-    active_months_total?: number
-    wallet_age_days?: number
-    first_tx_date?: string | null
-    last_tx_date?: string | null
-    origin_ym?: number
-    cum_ranks?: {
-      balance?: { rank:number; pct:number; bucket?:string } | null
-      activity?: { rank:number; pct:number } | null
-      volume?: { rank:number; pct:number } | null
-      overall?: { score?:number; rank?:number; pct?:number } | null
-    } | null
-    unique_tokens_traded_all?: number
-  },
-  monthly: Monthly[]
+type Payload = { summary: Summary; monthly: Monthly[] }
+
+const OWNER =
+  process.env.WCDN_OWNER ||
+  process.env.NEXT_PUBLIC_WCDN_OWNER ||
+  'zeinabshahi'
+
+function repoFor(addr: string) {
+  const a = addr.toLowerCase().replace(/^0x/, '')
+  const first = a[0] || '0'
+  return `wallets-${first}`
+}
+function pathFor(addr: string) {
+  const a = addr.toLowerCase().replace(/^0x/, '')
+  const pfx = a.slice(0, 2)
+  return `${pfx}/0x${a}.json`
 }
 
-function ymStrToInt(s: string){ const [y,m]=s.split('-').map(Number); return y*100 + m }
-function ymIntToStr(n: number){ const y=Math.floor(n/100), m=n%100; return `${y}-${String(m).padStart(2,'0')}` }
-function ymAdd(ym:number, k:number){ const y=Math.floor(ym/100), m=ym%100; const d=new Date(Date.UTC(y,m-1,1)); d.setUTCMonth(d.getUTCMonth()+k); return d.getUTCFullYear()*100 + (d.getUTCMonth()+1) }
-function buildTimeline(origin:number, last:number){ const out:number[]=[]; for(let cur=origin; cur<=last; cur=ymAdd(cur,1)) out.push(cur); return out }
-function error(res: NextApiResponse, code: number, msg: string, note?: string){ return res.status(code).json({ error: msg, note }) }
-
-export default function handler(req: NextApiRequest, res: NextApiResponse) {
-  const address = String(req.query.address || '').toLowerCase().trim()
-  if (!address) return error(res, 400, 'address is required')
-  return serveCsvFallback(address, res)
+async function fetchWallet(addr: string) {
+  const url = `https://raw.githubusercontent.com/${OWNER}/${repoFor(addr)}/main/${pathFor(addr)}`
+  const r = await fetch(url, { cache: 'no-store' })
+  if (!r.ok) throw new Error(`cdn 404: ${url}`)
+  return r.json()
 }
 
-function serveCsvFallback(address: string, res: NextApiResponse, note?: string) {
+// GitHub wallet doc → Payload موردنیاز کامپوننت‌ها
+function adapt(doc: any): Payload {
+  const months = Object.keys(doc?.months || {}).sort()
+  const monthly: Monthly[] = months.map((ym) => {
+    const m = doc.months[ym] || {}
+    return {
+      month: ym,
+      ym: parseInt(ym.replace('-', ''), 10),
+      avg_balance_eth: Number(m.bal ?? 0),
+      volume_usd: 0,
+      native_txs: Number(m.txs ?? 0),
+      token_txs: 0,
+      uniq_contracts: Number(m.uniq ?? 0),
+      uniq_days: Number(m.days ?? 0),
+      uniq_weeks: 0,
+      nft_unique_contracts: Number(m.nft ?? 0),
+      gas_spent_eth: Number(m.gas ?? 0),
+      ranks: (m.rank_m!=null || m.pct_m!=null)
+        ? { overall: { rank: Number(m.rank_m ?? 0), pct: Number(m.pct_m ?? 0) } as any }
+        : null
+    }
+  })
+
+  const best_streak_days = Number(doc?.lifetime?.streak_best_days ?? 0)
+  const summary: Summary = {
+    current_streak_months: 0,
+    best_streak_months: Math.round(best_streak_days / 30),
+    active_months_total: Number(doc?.lifetime?.months_active ?? months.length),
+    wallet_age_days: 0,
+    cum_ranks: { overall: { score: 0, rank: Number(doc?.rank ?? 0), pct: 0 } }
+  }
+  return { summary, monthly }
+}
+
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
-    const csvName = process.env.WALLET_CSV || 'demo_wallet_monthly_full.csv'
-    const filePath = path.join(process.cwd(), 'public', 'data', csvName)
-    if (!fs.existsSync(filePath)) return error(res, 404, 'csv_not_found', `expected at ${filePath}`)
-    const raw = fs.readFileSync(filePath, 'utf-8')
-    const lines = raw.split(/\r?\n/).filter(Boolean)
-    if (lines.length < 2) return error(res, 404, 'csv_empty')
-
-    const header = lines[0].split(',')
-    const idx = (name:string) => header.indexOf(name)
-    const ixYM = idx('ym')
-    const ixAddr = idx('wallet')
-
-    const rows = lines.slice(1).map((ln) => {
-      const cols = ln.split(',')
-      const wallet = (cols[ixAddr] || '').toLowerCase().trim()
-      return { wallet, cols }
-    }).filter(r => r.wallet === address)
-
-    if (!rows.length) return error(res, 404, 'wallet_not_found_in_csv', note)
-
-    const byYm = new Map<number, string[]>()
-    for (const r of rows) {
-      const ym = ymStrToInt(r.cols[ixYM])
-      byYm.set(ym, r.cols)
+    const address = String(req.query.address || '').toLowerCase()
+    if (!address || !address.startsWith('0x') || address.length !== 42) {
+      res.status(400).json({ error: 'address is required' }); return
     }
-
-    const allYms = [...byYm.keys()].sort((a,b)=> a-b)
-    const originYm = Math.min(...allYms, 202307)
-    const lastYm   = Math.max(...byYm.keys())
-    const timeline = buildTimeline(originYm, lastYm)
-
-    const g = (cols:string[], name:string) => {
-      const i = header.indexOf(name)
-      if (i < 0) return 0
-      const v = Number(cols[i])
-      return Number.isFinite(v) ? v : 0
-    }
-
-    const monthly: Monthly[] = timeline.map((ym) => {
-      const cols = byYm.get(ym)
-      if (!cols) {
-        return { ym, month: ymIntToStr(ym), avg_balance_usd:0, avg_balance_eth:0, volume_usd:0, swap_volume_usd:0, bridge_volume_usd:0, native_txs:0, token_txs:0, uniq_contracts:0, uniq_days:0, uniq_weeks:0, nft_unique_contracts:0, nft_holds_builder:0, nft_holds_introduced:0, tokens_traded_unique:0, gas_spent_eth:0, ranks:null }
-      }
-      const tx_count           = g(cols, 'tx_count')
-      const erc20_transfers    = g(cols, 'erc20_transfers')
-      const nft_transfers      = g(cols, 'nft_transfers')
-      const uniq_days          = g(cols, 'unique_days_active')
-      const contracts_interact = g(cols, 'contracts_interacted')
-      const fee_eth            = g(cols, 'fee_eth')
-      const rank_activity      = g(cols, 'rank_activity')
-      const pct_activity       = g(cols, 'pct_activity')
-      const rank_fee_usd       = g(cols, 'rank_fee_usd')
-      const pct_fee_usd        = g(cols, 'pct_fee_usd')
-      const native_txs = Math.max(0, tx_count - erc20_transfers - nft_transfers)
-      const token_txs  = erc20_transfers
-
-      return {
-        ym,
-        month: ymIntToStr(ym),
-        avg_balance_usd: 0,
-        avg_balance_eth: 0,
-        volume_usd: 0,
-        swap_volume_usd: 0,
-        bridge_volume_usd: 0,
-        native_txs,
-        token_txs,
-        uniq_contracts: contracts_interact,
-        uniq_days,
-        uniq_weeks: 0,
-        nft_unique_contracts: 0,
-        nft_holds_builder: 0,
-        nft_holds_introduced: 0,
-        tokens_traded_unique: 0,
-        gas_spent_eth: fee_eth,
-        ranks: {
-          balance: undefined as any,
-          volume: isFinite(rank_fee_usd) ? { rank: rank_fee_usd, pct: pct_fee_usd } as any : undefined,
-          activity: isFinite(rank_activity) ? { rank: rank_activity, pct: pct_activity } : undefined,
-          nft: undefined as any,
-          overall: undefined as any,
-        }
-      }
-    })
-
-    let best = 0, cur = 0, activeMonths = 0, walletAgeDays = 0
-    for (const m of monthly) {
-      const active = (m.uniq_days || 0) > 0
-      walletAgeDays += (m.uniq_days || 0)
-      if (active) { activeMonths += 1; cur += 1; if (cur > best) best = cur }
-      else { cur = 0 }
-    }
-    const firstYm = monthly.find(m => (m.uniq_days||0)>0)?.ym ?? monthly[0]?.ym
-    const lastYmActive = [...monthly].reverse().find(m => (m.uniq_days||0)>0)?.ym ?? monthly[monthly.length-1]?.ym
-
-    const payload: Payload = {
-      summary: {
-        current_streak_months: 0,
-        best_streak_months: best,
-        active_months_total: activeMonths,
-        wallet_age_days: walletAgeDays,
-        origin_ym: originYm,
-        first_tx_date: firstYm ? `${String(Math.floor(firstYm/100)).padStart(4,'0')}-${String(firstYm%100).padStart(2,'0')}-01` : null,
-        last_tx_date: lastYmActive ? `${String(Math.floor(lastYmActive/100)).padStart(4,'0')}-${String(lastYmActive%100).padStart(2,'0')}-28` : null,
-        cum_ranks: null,
-        unique_tokens_traded_all: 0,
-      },
-      monthly
-    }
-    return res.status(200).json(payload)
-  } catch (e:any) {
-    return error(res, 500, e?.message || 'internal_error', note)
+    const doc = await fetchWallet(address)
+    const payload = adapt(doc)
+    res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=600')
+    res.status(200).json(payload)
+  } catch (e: any) {
+    res.status(404).json({ error: e?.message || 'not found' })
   }
 }

@@ -1,4 +1,3 @@
-// pages/api/wcdn/[addr].ts
 import type { NextApiRequest, NextApiResponse } from 'next'
 
 const OWNER =
@@ -6,26 +5,35 @@ const OWNER =
   process.env.NEXT_PUBLIC_WCDN_OWNER ||
   'zeinabshahi'
 
-function toRawUrl(addr: string) {
-  const a = addr.toLowerCase()
-  if (!/^0x[0-9a-f]{40}$/.test(a)) throw new Error('invalid address')
-  const shard = a[2]                  // 0..f
-  const p2 = a.slice(2, 4)            // 00..ff
-  const repo = `wallets-${shard}`
-  const path = `${p2}/${a}.json`
-  return `https://raw.githubusercontent.com/${OWNER}/${repo}/main/${path}`
+// repo: بر اساس اولین کاراکتر بعد از 0x  → wallets-6 / wallets-c / ...
+function repoFor(addr: string) {
+  const a = addr.toLowerCase().replace(/^0x/, '')
+  const first = a[0] || '0'
+  return `wallets-${first}`
+}
+
+// path: پوشه‌ی دوکاراکتری اول  → 63/0x63...json
+function pathFor(addr: string) {
+  const a = addr.toLowerCase().replace(/^0x/, '')
+  const pfx = a.slice(0, 2)
+  return `${pfx}/0x${a}.json`
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
-    const addr = String(req.query.addr || '')
-    const url = toRawUrl(addr)
+    const addr = String(req.query.addr || '').toLowerCase()
+    if (!addr || !addr.startsWith('0x') || addr.length !== 42) {
+      res.status(400).json({ error: 'invalid address' }); return
+    }
+
+    const url = `https://raw.githubusercontent.com/${OWNER}/${repoFor(addr)}/main/${pathFor(addr)}`
     const r = await fetch(url, { cache: 'no-store' })
-    if (!r.ok) return res.status(404).json({ error: 'not-found' })
-    res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate=86400')
-    const json = await r.json()
-    return res.status(200).json(json)
+    if (!r.ok) { res.status(404).json({ error: 'not found', url }); return }
+
+    const j = await r.json()
+    res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=600')
+    res.status(200).json(j)
   } catch (e: any) {
-    return res.status(400).json({ error: e?.message ?? 'bad-request' })
+    res.status(500).json({ error: e?.message || 'failed' })
   }
 }
