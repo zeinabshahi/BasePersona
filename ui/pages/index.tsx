@@ -10,12 +10,20 @@ import styles from '../components/frames.module.css'
 
 declare global { interface Window { ethereum?: any } }
 
+/* -------- Error Boundary ساده -------- */
+class ClientBoundary extends React.Component<{children: React.ReactNode},{hasError:boolean}>{
+  constructor(p:any){ super(p); this.state={hasError:false} }
+  static getDerivedStateFromError(){ return {hasError:true} }
+  componentDidCatch(){ /* noop */ }
+  render(){ return this.state.hasError ? <div className="card" style={{padding:24}}>Something went wrong in a client widget.</div> : this.props.children }
+}
+
 const DEFAULT_PROMPT =
   'waist-up 3D rendered portrait of a futuristic male character in ornate mythic sci-fi armor with gold reflections and glowing blue energy veins, realistic skin and metal materials, cinematic studio lighting, platinum halo above head emitting soft light, floating omni headdress with luminous parts, full AR visor showing holographic interface, surrounded by glowing golden aura and subtle particle fog, deep electric blue background, stylized 3D render, ultra detailed, symmetrical composition, 1:1 aspect ratio'
 
 type MonthOpt = { ym: number; label: string }
 
-/* ------- types for WalletMetrics dynamic import (must match component) ------- */
+/* ------- props for WalletMetrics ------- */
 type WalletMetricsProps = {
   address?: string
   selectedYm: number | null
@@ -23,21 +31,22 @@ type WalletMetricsProps = {
   onSelectionChange?: (ym: number) => void
 }
 
-/* Safe dynamic import (ensures default component) */
-const WalletMetricsComp = dynamic<WalletMetricsProps>(
-  () => import('../components/WalletMetrics').then(m => (m as any).default ?? m as any),
-  { ssr: false }
-)
+/* Dynamic imports — حتماً default را برگردان */
+const WalletMetricsComp = dynamic(() =>
+  import('../components/WalletMetrics').then(m => (m as any).default || m),
+  { ssr: false, loading: () => <div className="card" style={{height:320}}/> }
+) as React.ComponentType<WalletMetricsProps>
 
 const CardPreviewMint = dynamic(
-  () => import('../components/CardPreviewMint'),
-  { ssr: false }
+  () => import('../components/CardPreviewMint').then(m => (m as any).default || m),
+  { ssr: false, loading: () => <div className="card" style={{height:320}}/> }
 )
 
 /* ---------------- helpers ---------------- */
 function rnd(a: number, b: number) { return a + (b - a) * Math.random() }
 function rint(a: number, b: number) { return Math.floor(rnd(a, b)) }
 
+// Fallback stats برای کارت پریویو (همیشه چیزی داریم)
 function buildRandomMetrics(addr: string): WalletStatRecord {
   return {
     address: addr,
@@ -57,7 +66,7 @@ function buildRandomMetrics(addr: string): WalletStatRecord {
   }
 }
 
-/* Minimal adapter for Persona Preview (optional) */
+// Adapter خیلی مینیمال از CDN JSON به کارت پریویو
 type WalletDocCDN = {
   wallet: string
   rank: number
@@ -131,7 +140,7 @@ function buildRandomNarrative(stats?: WalletStatRecord) {
 export default function Page() {
   const { address: connectedAddress, isConnected } = useAccount()
 
-  const [address, setAddress] = useState<string>('') // always string
+  const [address, setAddress] = useState<string>('') // همیشه string
   const [walletStats, setWalletStats] = useState<WalletStatRecord | null>(null)
   const [persona, setPersona] = useState<any>(null)
   const [narrative, setNarrative] = useState<any>(null)
@@ -145,6 +154,7 @@ export default function Page() {
   useEffect(() => { if (isConnected && connectedAddress) setAddress(connectedAddress) }, [isConnected, connectedAddress])
   useEffect(() => { setSelectedYm(null) }, [address])
 
+  // Analyze: پر کردن کارت پریویو + پرسونای متنی (best-effort)
   async function analyze() {
     const addr = (isConnected && connectedAddress) ? connectedAddress : address
     if (!addr || addr.length < 4) return
@@ -159,7 +169,6 @@ export default function Page() {
       } catch {
         setWalletStats(buildRandomMetrics(addr))
       }
-
       try {
         const p = await fetch('/api/persona', {
           method: 'POST',
@@ -168,7 +177,6 @@ export default function Page() {
         }).then(r => r.json())
         setPersona(p)
       } catch { setPersona(null) }
-
       try {
         const n = await fetch('/api/narrative', {
           method: 'POST',
@@ -184,6 +192,7 @@ export default function Page() {
     }
   }
 
+  // داده پیش‌فرض برای کارت پریویو وقتی هنوز analyze نکردیم
   const statsToShow = useMemo(
     () => walletStats ?? {
       address: address || '—',
@@ -231,8 +240,7 @@ export default function Page() {
                   title={isConnected ? 'Using connected wallet' : 'Type an address or leave blank (demo)'}
                   style={isConnected ? { opacity: 0.85, cursor: 'not-allowed' } : undefined}
                 />
-
-                {/* Month dropdown (fed by WalletMetrics) */}
+                {/* Month dropdown (لیست را WalletMetrics می‌دهد) */}
                 <div className={styles.selectShell}>
                   <select
                     className={styles.selectMonth}
@@ -248,21 +256,22 @@ export default function Page() {
                     ))}
                   </select>
                 </div>
-
                 <button className="btn primary" onClick={analyze} disabled={busy.analyze}>
                   {busy.analyze ? 'Analyzing…' : 'Analyze'}
                 </button>
               </div>
             </div>
 
-            {/* Metrics */}
+            {/* Metrics (با ErrorBoundary تا صفحه سفید نشه) */}
             {mounted && (
-              <WalletMetricsComp
-                address={address || ''}
-                selectedYm={selectedYm}
-                onMonthsLoaded={(list: MonthOpt[]) => setMonthOptions(list)}
-                onSelectionChange={(ym: number) => setSelectedYm(ym)}
-              />
+              <ClientBoundary>
+                <WalletMetricsComp
+                  address={address || ''}
+                  selectedYm={selectedYm}
+                  onMonthsLoaded={(list: MonthOpt[]) => setMonthOptions(list)}
+                  onSelectionChange={(ym: number) => setSelectedYm(ym)}
+                />
+              </ClientBoundary>
             )}
 
             {/* Persona + Preview */}
