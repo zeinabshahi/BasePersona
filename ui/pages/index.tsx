@@ -15,15 +15,15 @@ const DEFAULT_PROMPT =
 
 type MonthOpt = { ym: number; label: string }
 
-/* ------- types for WalletMetrics dynamic import ------- */
+/* ------- types for WalletMetrics dynamic import (match component exactly) ------- */
 type WalletMetricsProps = {
-  address: string
+  address?: string
   selectedYm: number | null
-  onMonthsLoaded: (list: MonthOpt[]) => void
-  onSelectionChange: (ym: number) => void
+  onMonthsLoaded?: (list: MonthOpt[]) => void
+  onSelectionChange?: (ym: number) => void
 }
 
-/* Use generic to keep props type-safe */
+/* Keep props type-safe, but ensure the module's default matches this shape */
 const WalletMetricsComp = dynamic<WalletMetricsProps>(
   () => import('../components/WalletMetrics'),
   { ssr: false }
