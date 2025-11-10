@@ -1,4 +1,3 @@
-// components/WalletMetrics.tsx
 import * as React from 'react'
 import styles from './frames.module.css'
 
@@ -43,8 +42,8 @@ type Props = {
 const fmt = (n?: number, d = 2) =>
   n == null || Number.isNaN(n) ? '—' : Number(n).toFixed(d)
 
-function sum(arr: number[]) { return arr.reduce((a, b) => a + b, 0) }
-function mean(arr: number[]) { return arr.length ? sum(arr) / arr.length : 0 }
+const sum = (arr: number[]) => arr.reduce((a, b) => a + b, 0)
+const mean = (arr: number[]) => (arr.length ? sum(arr) / arr.length : 0)
 
 function delta(cur?: number, prev?: number) {
   if (cur == null || prev == null) return { diff: null as number | null, pct: null as number | null, sign: 0 as -1 | 0 | 1 }
@@ -53,7 +52,7 @@ function delta(cur?: number, prev?: number) {
   return { diff, pct, sign: diff === 0 ? 0 : (diff > 0 ? 1 : -1) as -1 | 0 | 1 }
 }
 
-/* mini spark (بدون لیبل‌های تاریخ) */
+/* mini spark (بدون لیبل‌های تاریخ – فقط تولتیپ) */
 function Spark({
   series, labels, selected, color,
 }: { series: number[]; labels: string[]; selected: number; color: string }) {
@@ -195,29 +194,26 @@ const WalletMetrics: React.FC<Props> = ({ address, selectedYm, onMonthsLoaded, o
     streak: modeAllTime ? Math.max(...sStreak, 0) : (cur.uniq_weeks ?? 0),
     gas: modeAllTime ? sum(sGas) : (cur.gas_spent_eth ?? 0),
     nft: modeAllTime ? sum(sNft) : (cur.nft_unique_contracts ?? 0),
-    rank: modeAllTime ? Math.min(...sRank.filter(x => x > 0), 0) || 0 : (cur.ranks?.overall?.rank ?? 0),
+    rank: modeAllTime ? (Math.min(...sRank.filter(x => x > 0)) || 0) : (cur.ranks?.overall?.rank ?? 0),
   }
 
   // deltas (در حالت All time مخفی/—)
   const dBalance = modeAllTime ? null : delta(cur.avg_balance_eth, prev.avg_balance_eth)
-  const dTrades = modeAllTime ? null : delta(cur.token_txs, prev.token_txs)
-  const dTxs = modeAllTime ? null : delta(cur.native_txs, prev.native_txs)
-  const dUniq = modeAllTime ? null : delta(cur.uniq_contracts, prev.uniq_contracts)
-  const dDays = modeAllTime ? null : delta(cur.uniq_days, prev.uniq_days)
-  const dStreak = modeAllTime ? null : delta(cur.uniq_weeks, prev.uniq_weeks)
-  const dGas = modeAllTime ? null : delta(cur.gas_spent_eth, prev.gas_spent_eth)
-  const dNft = modeAllTime ? null : delta(cur.nft_unique_contracts, prev.nft_unique_contracts)
-  const dRank = modeAllTime
-    ? null
-    : (() => {
-        const a = cur.ranks?.overall?.rank
-        const b = prev.ranks?.overall?.rank
-        if (a == null || b == null) return null
-        const diff = b - a // بهبود اگر مثبت باشد
-        return { diff, pct: null, sign: diff === 0 ? 0 : (diff > 0 ? 1 : -1) as -1 | 0 | 1 }
-      })()
+  const dTrades  = modeAllTime ? null : delta(cur.token_txs, prev.token_txs)
+  const dTxs     = modeAllTime ? null : delta(cur.native_txs, prev.native_txs)
+  const dUniq    = modeAllTime ? null : delta(cur.uniq_contracts, prev.uniq_contracts)
+  const dDays    = modeAllTime ? null : delta(cur.uniq_days, prev.uniq_days)
+  const dStreak  = modeAllTime ? null : delta(cur.uniq_weeks, prev.uniq_weeks)
+  const dGas     = modeAllTime ? null : delta(cur.gas_spent_eth, prev.gas_spent_eth)
+  const dNft     = modeAllTime ? null : delta(cur.nft_unique_contracts, prev.nft_unique_contracts)
+  const dRank    = modeAllTime ? null : (() => {
+    const a = cur.ranks?.overall?.rank, b = prev.ranks?.overall?.rank
+    if (a == null || b == null) return null
+    const diff = b - a // بهبود اگر مثبت باشد
+    return { diff, pct: null, sign: diff === 0 ? 0 : (diff > 0 ? 1 : -1) as -1 | 0 | 1 }
+  })()
 
-  const selLocal = selIndex // فقط برای هایلایت نقطه
+  const selLocal = selIndex // برای هایلایت نقطه
 
   /* ---------- card helper ---------- */
   const Card = ({
@@ -240,8 +236,7 @@ const WalletMetrics: React.FC<Props> = ({ address, selectedYm, onMonthsLoaded, o
       </div>
       <div className={styles.row}>
         <div className={styles.big}>
-          {value}
-          {unit ? <span style={{ fontSize: 14, marginLeft: 6 }}>{unit}</span> : null}
+          {value}{unit ? <span style={{ fontSize: 14, marginLeft: 6 }}>{unit}</span> : null}
         </div>
         <div className={styles.sub}>{subtitle ?? ''}</div>
         <div className={styles.delta}>
@@ -257,95 +252,28 @@ const WalletMetrics: React.FC<Props> = ({ address, selectedYm, onMonthsLoaded, o
   return (
     <div className={styles.grid}>
       {/* Row 1 */}
-      <Card
-        title="Balance (ETH)"
-        value={fmt(V.balance, 3)}
-        unit=""
-        deltaObj={dBalance ?? undefined}
-        series={sBal}
-        labels={labels}
-        color="rgb(59,130,246)"
-        subtitle="on-chain (avg)"
-      />
-      <Card
-        title="Trades (count)"
-        value={fmt(V.trades, 0)}
-        unit=""
-        deltaObj={dTrades ?? undefined}
-        series={sTrades}
-        labels={labels}
-        color="rgb(16,185,129)"
-        subtitle="swap/trade tx count"
-      />
-      <Card
-        title="Transactions"
-        value={fmt(V.txs, 0)}
-        unit=""
-        deltaObj={dTxs ?? undefined}
-        series={sTxs}
-        labels={labels}
-        color="rgb(37,99,235)"
-        subtitle="txs per month"
-      />
+      <Card title="Balance (ETH)" value={fmt(V.balance, 3)} unit="" deltaObj={dBalance ?? undefined}
+            series={sBal} labels={labels} color="rgb(59,130,246)" subtitle="on-chain (avg)" />
+      <Card title="Trades (count)" value={fmt(V.trades, 0)} deltaObj={dTrades ?? undefined}
+            series={sTrades} labels={labels} color="rgb(16,185,129)" subtitle="swap/trade tx count" />
+      <Card title="Transactions" value={fmt(V.txs, 0)} deltaObj={dTxs ?? undefined}
+            series={sTxs} labels={labels} color="rgb(37,99,235)" subtitle="txs per month" />
 
       {/* Row 2 */}
-      <Card
-        title="Unique Contracts"
-        value={fmt(V.uniq, 0)}
-        deltaObj={dUniq ?? undefined}
-        series={sUniq}
-        labels={labels}
-        color="rgb(234,179,8)"
-        subtitle="per month"
-      />
-      <Card
-        title="Active Days"
-        value={fmt(V.days, 0)}
-        deltaObj={dDays ?? undefined}
-        series={sDays}
-        labels={labels}
-        color="rgb(147,51,234)"
-        subtitle="per month"
-      />
-      <Card
-        title="Best Streak (days)"
-        value={fmt(V.streak, 0)}
-        deltaObj={dStreak ?? undefined}
-        series={sStreak}
-        labels={labels}
-        color="rgb(245,158,11)"
-        subtitle="within month"
-      />
+      <Card title="Unique Contracts" value={fmt(V.uniq, 0)} deltaObj={dUniq ?? undefined}
+            series={sUniq} labels={labels} color="rgb(234,179,8)" subtitle="per month" />
+      <Card title="Active Days" value={fmt(V.days, 0)} deltaObj={dDays ?? undefined}
+            series={sDays} labels={labels} color="rgb(147,51,234)" subtitle="per month" />
+      <Card title="Best Streak (days)" value={fmt(V.streak, 0)} deltaObj={dStreak ?? undefined}
+            series={sStreak} labels={labels} color="rgb(245,158,11)" subtitle="within month" />
 
       {/* Row 3 */}
-      <Card
-        title="Gas Paid (ETH)"
-        value={fmt(V.gas, 4)}
-        deltaObj={dGas ?? undefined}
-        series={sGas}
-        labels={labels}
-        color="rgb(244,63,94)"
-        subtitle={modeAllTime ? 'all-time' : 'this month'}
-      />
-      <Card
-        title="NFT (count)"
-        value={fmt(V.nft, 0)}
-        deltaObj={dNft ?? undefined}
-        series={sNft}
-        labels={labels}
-        color="rgb(99,102,241)"
-        subtitle="unique NFT contracts"
-      />
-      <Card
-        title="Monthly Rank"
-        value={V.rank ? `#${fmt(V.rank, 0)}` : '—'}
-        deltaObj={dRank ?? undefined}
-        series={sRank}
-        labels={labels}
-        color="rgb(107,114,128)"
-        subtitle="better is lower"
-        footNote=""
-      />
+      <Card title="Gas Paid (ETH)" value={fmt(V.gas, 4)} deltaObj={dGas ?? undefined}
+            series={sGas} labels={labels} color="rgb(244,63,94)" subtitle={modeAllTime ? 'all-time' : 'this month'} />
+      <Card title="NFT (count)" value={fmt(V.nft, 0)} deltaObj={dNft ?? undefined}
+            series={sNft} labels={labels} color="rgb(99,102,241)" subtitle="unique NFT contracts" />
+      <Card title="Monthly Rank" value={V.rank ? `#${fmt(V.rank, 0)}` : '—'} deltaObj={dRank ?? undefined}
+            series={sRank} labels={labels} color="rgb(107,114,128)" subtitle="better is lower" footNote="" />
     </div>
   )
 }

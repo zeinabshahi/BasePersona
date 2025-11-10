@@ -15,7 +15,7 @@ const DEFAULT_PROMPT =
 
 type MonthOpt = { ym: number; label: string }
 
-/* ------- types for WalletMetrics dynamic import (match component exactly) ------- */
+/* ------- types for WalletMetrics dynamic import (must match component) ------- */
 type WalletMetricsProps = {
   address?: string
   selectedYm: number | null
@@ -23,9 +23,9 @@ type WalletMetricsProps = {
   onSelectionChange?: (ym: number) => void
 }
 
-/* Keep props type-safe, but ensure the module's default matches this shape */
+/* Safe dynamic import (ensures default component) */
 const WalletMetricsComp = dynamic<WalletMetricsProps>(
-  () => import('../components/WalletMetrics'),
+  () => import('../components/WalletMetrics').then(m => (m as any).default ?? m as any),
   { ssr: false }
 )
 
@@ -35,11 +35,9 @@ const CardPreviewMint = dynamic(
 )
 
 /* ---------------- helpers ---------------- */
-
 function rnd(a: number, b: number) { return a + (b - a) * Math.random() }
 function rint(a: number, b: number) { return Math.floor(rnd(a, b)) }
 
-// Fallback stats for the preview card when APIs fail or wallet is missing
 function buildRandomMetrics(addr: string): WalletStatRecord {
   return {
     address: addr,
@@ -59,7 +57,7 @@ function buildRandomMetrics(addr: string): WalletStatRecord {
   }
 }
 
-// Minimal adapter: derive a WalletStatRecord-ish view from WalletDoc (CDN JSON)
+/* Minimal adapter for Persona Preview (optional) */
 type WalletDocCDN = {
   wallet: string
   rank: number
@@ -116,7 +114,6 @@ function adaptDocToStats(doc: WalletDocCDN): WalletStatRecord {
   }
 }
 
-// Persona/narrative fallback
 function buildRandomNarrative(stats?: WalletStatRecord) {
   const tone = (stats?.volumeETH ?? 0) > 5 ? 'active degen' : 'calm builder'
   return {
@@ -131,7 +128,6 @@ function buildRandomNarrative(stats?: WalletStatRecord) {
 }
 
 /* ---------------- page ---------------- */
-
 export default function Page() {
   const { address: connectedAddress, isConnected } = useAccount()
 
@@ -149,14 +145,12 @@ export default function Page() {
   useEffect(() => { if (isConnected && connectedAddress) setAddress(connectedAddress) }, [isConnected, connectedAddress])
   useEffect(() => { setSelectedYm(null) }, [address])
 
-  // analyze button handler
   async function analyze() {
     const addr = (isConnected && connectedAddress) ? connectedAddress : address
     if (!addr || addr.length < 4) return
     setAddress(addr)
     setBusy(b => ({ ...b, analyze: true }))
     try {
-      // 1) Try CDN wallet doc and adapt
       try {
         const r = await fetch(`/api/wcdn/${addr}`)
         if (!r.ok) throw new Error(`wallet cdn ${r.status}`)
@@ -166,7 +160,6 @@ export default function Page() {
         setWalletStats(buildRandomMetrics(addr))
       }
 
-      // 2) Persona + narrative (best-effort)
       try {
         const p = await fetch('/api/persona', {
           method: 'POST',
@@ -174,9 +167,7 @@ export default function Page() {
           body: JSON.stringify({ metrics: {}, timeAnchor: null }),
         }).then(r => r.json())
         setPersona(p)
-      } catch {
-        setPersona(null)
-      }
+      } catch { setPersona(null) }
 
       try {
         const n = await fetch('/api/narrative', {
