@@ -8,15 +8,31 @@ import { useAccount } from 'wagmi'
 import type { WalletStatRecord } from '../components/WalletStats'
 import styles from '../components/frames.module.css'
 
-const WalletMetricsComp = dynamic(() => import('../components/WalletMetrics'), { ssr: false })
-const CardPreviewMint   = dynamic(() => import('../components/CardPreviewMint'), { ssr: false })
-
 declare global { interface Window { ethereum?: any } }
 
 const DEFAULT_PROMPT =
   'waist-up 3D rendered portrait of a futuristic male character in ornate mythic sci-fi armor with gold reflections and glowing blue energy veins, realistic skin and metal materials, cinematic studio lighting, platinum halo above head emitting soft light, floating omni headdress with luminous parts, full AR visor showing holographic interface, surrounded by glowing golden aura and subtle particle fog, deep electric blue background, stylized 3D render, ultra detailed, symmetrical composition, 1:1 aspect ratio'
 
 type MonthOpt = { ym: number; label: string }
+
+/* ------- types for WalletMetrics dynamic import ------- */
+type WalletMetricsProps = {
+  address: string;                                // must be string (never undefined)
+  selectedYm: number | null;
+  onMonthsLoaded: (list: MonthOpt[]) => void;
+  onSelectionChange: (ym: number) => void;
+}
+
+/* Use generic to keep props type-safe */
+const WalletMetricsComp = dynamic<WalletMetricsProps>(
+  () => import('../components/WalletMetrics'),
+  { ssr: false }
+)
+
+const CardPreviewMint = dynamic(
+  () => import('../components/CardPreviewMint'),
+  { ssr: false }
+)
 
 /* ---------------- helpers ---------------- */
 
@@ -119,7 +135,7 @@ function buildRandomNarrative(stats?: WalletStatRecord) {
 export default function Page() {
   const { address: connectedAddress, isConnected } = useAccount()
 
-  const [address, setAddress] = useState('')
+  const [address, setAddress] = useState<string>('')            // always a string
   const [walletStats, setWalletStats] = useState<WalletStatRecord | null>(null)
   const [persona, setPersona] = useState<any>(null)
   const [narrative, setNarrative] = useState<any>(null)
@@ -248,10 +264,10 @@ export default function Page() {
               </div>
             </div>
 
-            {/* Metrics (charts always have demo; overridden when address is provided) */}
+            {/* Metrics */}
             {mounted && (
               <WalletMetricsComp
-                address={address || undefined}
+                address={address || ''}                               {/* << fix: always string */}
                 selectedYm={selectedYm}
                 onMonthsLoaded={(list: MonthOpt[]) => setMonthOptions(list)}
                 onSelectionChange={(ym: number) => setSelectedYm(ym)}
