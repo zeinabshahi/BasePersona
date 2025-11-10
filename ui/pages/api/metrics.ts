@@ -1,108 +1,99 @@
+// pages/api/metrics.ts
 import type { NextApiRequest, NextApiResponse } from 'next'
 
-type Rank = { rank:number; pct:number; score?:number }
-type Monthly = {
-  month: string
-  ym: number
-  avg_balance_usd?: number
-  avg_balance_eth?: number
-  volume_usd?: number
-  swap_volume_usd?: number
-  bridge_volume_usd?: number
-  native_txs?: number
-  token_txs?: number
-  uniq_contracts?: number
-  uniq_days?: number
-  uniq_weeks?: number
-  nft_unique_contracts?: number
-  nft_holds_builder?: number
-  nft_holds_introduced?: number
-  tokens_traded_unique?: number
-  gas_spent_eth?: number
-  ranks?: { balance?: Rank; volume?: Rank; activity?: Rank; nft?: Rank; overall?: Rank } | null
-}
-type Summary = {
-  current_streak_months?: number
-  best_streak_months?: number
-  active_months_total?: number
-  wallet_age_days?: number
-  cum_ranks?: {
-    balance?: { rank:number; pct:number; bucket?:string }
-    activity?: Rank
-    volume?: Rank
-    overall?: { score:number; rank:number; pct:number }
-  } | null
-}
-type Payload = { summary: Summary; monthly: Monthly[] }
-
-const OWNER =
-  process.env.WCDN_OWNER ||
-  process.env.NEXT_PUBLIC_WCDN_OWNER ||
-  'zeinabshahi'
-
-function repoFor(addr: string) {
-  const a = addr.toLowerCase().replace(/^0x/, '')
-  const first = a[0] || '0'
-  return `wallets-${first}`
-}
-function pathFor(addr: string) {
-  const a = addr.toLowerCase().replace(/^0x/, '')
-  const pfx = a.slice(0, 2)
-  return `${pfx}/0x${a}.json`
-}
-
-async function fetchWallet(addr: string) {
-  const url = `https://raw.githubusercontent.com/${OWNER}/${repoFor(addr)}/main/${pathFor(addr)}`
-  const r = await fetch(url, { cache: 'no-store' })
-  if (!r.ok) throw new Error(`cdn 404: ${url}`)
-  return r.json()
-}
-
-// GitHub wallet doc → Payload موردنیاز کامپوننت‌ها
-function adapt(doc: any): Payload {
-  const months = Object.keys(doc?.months || {}).sort()
-  const monthly: Monthly[] = months.map((ym) => {
-    const m = doc.months[ym] || {}
-    return {
-      month: ym,
-      ym: parseInt(ym.replace('-', ''), 10),
-      avg_balance_eth: Number(m.bal ?? 0),
-      volume_usd: 0,
-      native_txs: Number(m.txs ?? 0),
-      token_txs: 0,
-      uniq_contracts: Number(m.uniq ?? 0),
-      uniq_days: Number(m.days ?? 0),
-      uniq_weeks: 0,
-      nft_unique_contracts: Number(m.nft ?? 0),
-      gas_spent_eth: Number(m.gas ?? 0),
-      ranks: (m.rank_m!=null || m.pct_m!=null)
-        ? { overall: { rank: Number(m.rank_m ?? 0), pct: Number(m.pct_m ?? 0) } as any }
-        : null
-    }
-  })
-
-  const best_streak_days = Number(doc?.lifetime?.streak_best_days ?? 0)
-  const summary: Summary = {
-    current_streak_months: 0,
-    best_streak_months: Math.round(best_streak_days / 30),
-    active_months_total: Number(doc?.lifetime?.months_active ?? months.length),
-    wallet_age_days: 0,
-    cum_ranks: { overall: { score: 0, rank: Number(doc?.rank ?? 0), pct: 0 } }
+type WalletDoc = {
+  wallet: string
+  rank: number
+  lifetime: {
+    months_active: number
+    first: string
+    last: string
+    tx_sum: number
+    uniq_sum: number
+    trade_sum: number
+    nft_sum: number
+    gas_sum: number
+    avg_balance_eth_mean: number
+    streak_best_days: number
   }
-  return { summary, monthly }
+  months: Record<string, {
+    txs?: number
+    uniq?: number
+    trade?: number
+    nft?: number
+    gas?: number
+    bal?: number
+    days?: number
+    spread?: number
+    streak?: number
+    rank_m?: number
+    pct_m?: number
+    gas_method?: string
+  }>
+}
+
+function ymNum(ym: string) {
+  const [y, m] = ym.split('-').map(Number)
+  return (y || 0) * 100 + (m || 0)
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  try {
-    const address = String(req.query.address || '').toLowerCase()
-    if (!address || !address.startsWith('0x') || address.length !== 42) {
-      res.status(400).json({ error: 'address is required' }); return
+  const address = String(req.query.address || '').toLowerCase()
+  if (!address) return res.status(400).json({ error: 'missing address' })
+
+  // مستقیماً از روت wcdn خودمان بخوان
+  const origin = `${req.headers['x-forwarded-proto'] || 'https'}://${req.headers['x-forwarded-host'] || req.headers.host}`
+  const r = await fetch(`${origin}/api/wcdn/${address}`)
+  if (!r.ok) return res.status(r.status).json({ error: `wcdn ${r.status}` })
+
+  const doc = (await r.json()) as WalletDoc
+  const monthsKeys = Object.keys(doc.months || {}).sort()
+
+  const monthly = monthsKeys.map((k) => {
+    const m = doc.months[k] || {}
+    return {
+      month: k,                      // "2024-04"
+      ym: ymNum(k),                  // 202404
+      avg_balance_usd: undefined,
+      avg_balance_eth: m.bal ?? 0,
+      volume_usd: 0,                 // در سورس موجود نیست → صفر
+      swap_volume_usd: 0,
+      bridge_volume_usd: 0,
+      native_txs: m.txs ?? 0,        // کل txs را فعلاً native درنظر می‌گیریم
+      token_txs: 0,
+      uniq_contracts: m.uniq ?? 0,
+      uniq_days: m.days ?? 0,
+      uniq_weeks: 0,
+      nft_unique_contracts: m.nft ?? 0,
+      nft_holds_builder: undefined,
+      nft_holds_introduced: undefined,
+      tokens_traded_unique: 0,
+      gas_spent_eth: m.gas ?? 0,
+      ranks: {
+        overall: (m.rank_m != null || m.pct_m != null)
+          ? { rank: m.rank_m ?? 0, pct: m.pct_m ?? 0, score: 0 }
+          : undefined,
+        // بقیه rankها دیتای مستقیمی ندارند
+      }
     }
-    const doc = await fetchWallet(address)
-    const payload = adapt(doc)
-    res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=600')
-    res.status(200).json(payload)
-  } catch (e: any) {
-    res.status(404).json({ error: e?.message || 'not found' })
+  })
+
+  const summary = {
+    current_streak_months: (() => {
+      const last = monthsKeys[monthsKeys.length - 1]
+      return last ? (doc.months[last]?.streak ?? 0) : 0 // واحد: روز
+    })(),
+    best_streak_months: doc.lifetime?.streak_best_days ?? 0, // واحد: روز
+    active_months_total: doc.lifetime?.months_active ?? monthsKeys.length,
+    wallet_age_days: undefined, // اگر لازم شد می‌تونیم از first/now تخمین بزنیم
+    cum_ranks: {
+      balance: { rank: doc.rank ?? 0, pct: 0, bucket: undefined },
+      activity: undefined,
+      volume: undefined,
+      overall: { score: 0, rank: doc.rank ?? 0, pct: 0 }
+    }
   }
+
+  res.setHeader('Cache-Control', 's-maxage=600, stale-while-revalidate=1200')
+  return res.status(200).json({ summary, monthly })
 }

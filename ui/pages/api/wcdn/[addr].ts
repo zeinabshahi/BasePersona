@@ -1,39 +1,41 @@
+// pages/api/wcdn/[address].ts
 import type { NextApiRequest, NextApiResponse } from 'next'
 
-const OWNER =
-  process.env.WCDN_OWNER ||
-  process.env.NEXT_PUBLIC_WCDN_OWNER ||
-  'zeinabshahi'
+const GH_USER = process.env.WALLETS_GH_USER || 'zeinabshahi' // در صورت نیاز عوض کن
+const BRANCH  = process.env.WALLETS_GH_BRANCH || 'main'
 
-// repo: بر اساس اولین کاراکتر بعد از 0x  → wallets-6 / wallets-c / ...
-function repoFor(addr: string) {
-  const a = addr.toLowerCase().replace(/^0x/, '')
-  const first = a[0] || '0'
-  return `wallets-${first}`
+function splitAddr(addr: string) {
+  const a = addr.toLowerCase()
+  if (!a.startsWith('0x') || a.length < 5) throw new Error('bad address')
+  const nibble = a[2]          // e.g. '6'
+  const pre2   = a.slice(2, 4) // e.g. '6c'
+  return { nibble, pre2, norm: a }
 }
 
-// path: پوشه‌ی دوکاراکتری اول  → 63/0x63...json
-function pathFor(addr: string) {
-  const a = addr.toLowerCase().replace(/^0x/, '')
-  const pfx = a.slice(0, 2)
-  return `${pfx}/0x${a}.json`
+async function fetchRaw(user: string, repo: string, path: string, branch: string) {
+  // اول raw.githubusercontent؛ اگر نشد jsDelivr
+  const raw = `https://raw.githubusercontent.com/${user}/${repo}/${branch}/${path}`
+  let r = await fetch(raw, { headers: { 'Accept': 'application/json' } })
+  if (r.ok) return r
+  const cdn = `https://cdn.jsdelivr.net/gh/${user}/${repo}@${branch}/${path}`
+  r = await fetch(cdn, { headers: { 'Accept': 'application/json' } })
+  return r
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   try {
-    const addr = String(req.query.addr || '').toLowerCase()
-    if (!addr || !addr.startsWith('0x') || addr.length !== 42) {
-      res.status(400).json({ error: 'invalid address' }); return
-    }
+    const address = String(req.query.address || '')
+    const { nibble, pre2, norm } = splitAddr(address)
+    const repo = `wallets-${nibble}`
+    const path = `${pre2}/${norm}.json`
 
-    const url = `https://raw.githubusercontent.com/${OWNER}/${repoFor(addr)}/main/${pathFor(addr)}`
-    const r = await fetch(url, { cache: 'no-store' })
-    if (!r.ok) { res.status(404).json({ error: 'not found', url }); return }
+    const r = await fetchRaw(GH_USER, repo, path, BRANCH)
+    if (!r.ok) return res.status(r.status).json({ error: `github ${r.status}` })
 
-    const j = await r.json()
-    res.setHeader('Cache-Control', 'public, s-maxage=60, stale-while-revalidate=600')
-    res.status(200).json(j)
+    const json = await r.json()
+    res.setHeader('Cache-Control', 's-maxage=1800, stale-while-revalidate=3600')
+    return res.status(200).json(json)
   } catch (e: any) {
-    res.status(500).json({ error: e?.message || 'failed' })
+    return res.status(400).json({ error: e?.message || 'bad request' })
   }
 }
