@@ -1,6 +1,5 @@
 import * as React from 'react'
 import css from './frames.module.css'
-import { genDemoPayload } from '../lib/demoMetrics'
 
 type Rank = { rank:number; pct:number, score?:number }
 type Monthly = {
@@ -45,7 +44,7 @@ type Payload = { summary: Summary; monthly: Monthly[] }
 
 function fmt(n?: number, d=2){ return (n==null||isNaN(n))?'—':Number(n).toFixed(d) }
 function delta(a?: number, b?: number){
-  if(a==null||b==null) return {diff:null,pct:null,sign:0 as -1|0|1}
+  if(a==null||b==null) return {diff:null as number|null, pct:null as number|null, sign:0 as -1|0|1}
   const diff=a-b; const pct=b===0?(a===0?0:100):(diff/b)*100
   return {diff,pct,sign:(diff===0?0:(diff>0?1:-1)) as -1|0|1}
 }
@@ -67,24 +66,17 @@ function Spark({series, labels, selected, onSelect, color}:SparkProps){
       <svg viewBox={`0 0 ${w} ${h}`} className={css.spark} preserveAspectRatio="none">
         <path d={area} style={{fill: color.replace('rgb','rgba').replace(')',',.16)')}} />
         <path d={d} style={{stroke: color, strokeWidth: 2, fill: 'none'}} />
-        {xs.map((x,i)=>(
-          <circle key={i} cx={x} cy={y(series[i])} r={i===selected?4:2}
+        {xs.map((x,i)=>(<circle key={i} cx={x} cy={y(series[i])} r={i===selected?4:2}
                   className={i===selected?css.dotSel:css.dot}
-                  onClick={()=>onSelect(i)} />
-        ))}
+                  onClick={()=>onSelect(i)} />))}
       </svg>
       <div className={css.ticks}>
         {labels.map((lb,i)=>(
-          <button
-            key={i}
-            type="button"
+          <button key={i} type="button"
             className={i===selected?css.tickSel:css.tick}
             onClick={()=>onSelect(i)}
             style={{visibility: (i%showEvery===0 || i===labels.length-1)?'visible':'hidden'}}
-            title={lb}
-          >
-            {lb}
-          </button>
+            title={lb}>{lb}</button>
         ))}
       </div>
     </div>
@@ -97,7 +89,7 @@ export default function WalletFrames({ address }:{ address:string }) {
   const [data,setData]=React.useState<Payload|null>(null)
   const [err,setErr]=React.useState<string|null>(null)
 
-  // سِلکشن سراسری ماه + بازه
+  // انتخاب ماه + بازه
   const [sel,setSel]=React.useState(0)
   const [range,setRange]=React.useState<[number,number]|null>(null)
   const [preset,setPreset]=React.useState<'all'|'last6'|'last12'>('all')
@@ -129,14 +121,16 @@ export default function WalletFrames({ address }:{ address:string }) {
 
   const months = data.monthly
   const [r0,r1] = range ?? [0, months.length-1]
-  const view = months.slice(0, months.length)
-  const selLocal = Math.min(Math.max(sel-r0,0), view.length-1)
 
-  const cur = months[sel] || {}
-  const prev = months[sel-1] || {}
+  // ✅ بازه‌ی انتخاب‌شده را اعمال کن
+  const view = months.slice(Math.max(0,r0), Math.min(months.length-1, r1) + 1)
+  const selLocal = Math.min(Math.max(sel-r0,0), Math.max(0, view.length-1))
 
-  // سری‌ها
-  const labels = view.map(x=> x.month)
+  const cur  = months[sel]    || {}
+  const prev = months[sel-1]  || {}
+
+  // سری‌ها روی view
+  const labels  = view.map(x=> x.month)
   const sBalEth = view.map(x=> Number(x.avg_balance_eth||0))
   const sVolUsd = view.map(x=> Number(x.volume_usd||0))
   const sInter  = view.map(x=> Number((x.native_txs||0)+(x.token_txs||0)+(x.nft_unique_contracts||0)+(x.uniq_contracts||0)))
@@ -174,12 +168,9 @@ export default function WalletFrames({ address }:{ address:string }) {
   }
   function setLocal(i:number){ setSel(r0 + i) }
 
-  // Helper: hide a card when its entire series is zero
-  const hasAny = (arr:number[]) => arr.some(v => Number(v) !== 0)
-
   return (
     <div className={css.wrap}>
-      {/* ── نوار بالا ── */}
+      {/* Toolbar */}
       <div className={css.toolbar}>
         <div className={css.pills}>
           <button className={preset==='last6'?css.pillSel:css.pill} onClick={()=>applyPreset('last6')}>Last 6 months</button>
@@ -189,41 +180,36 @@ export default function WalletFrames({ address }:{ address:string }) {
         <div className={css.selMonth}>Month: <strong>{months[sel]?.month || '—'}</strong></div>
         <div className={css.streaks}>
           {(data.summary?.current_streak_months ?? 0) > 0 && (
-            <span className={css.badge}>Streak: {data.summary!.current_streak_months}</span>
+            <span className={css.badge}>Streak: {data.summary?.current_streak_months}</span>
           )}
-          {data.summary?.cum_ranks?.balance?.bucket && <span className={css.badge}>Bucket: {data.summary.cum_ranks.balance.bucket}</span>}
+          {data.summary?.cum_ranks?.balance?.bucket && (
+            <span className={css.badge}>Bucket: {data.summary.cum_ranks.balance.bucket}</span>
+          )}
         </div>
       </div>
 
-      {/* GRID: ۳×۳ */}
+      {/* GRID: ۹ فریم (۳×۳) — همیشه رندر می‌شوند */}
       <div className={css.grid}>
         {/* Row 1 */}
-        {hasAny(sBalEth) && (
         <div className={css.card}>
           <div className={css.head}><div className={css.title}>Balance (ETH)</div><div className={css.rank}>{cur?.ranks?.balance?.rank ? `Rank #${cur.ranks.balance.rank}` : '—'}</div></div>
           <div className={css.row}><div className={css.big}>{fmt(cur?.avg_balance_eth,3)}</div><div className={css.sub}>on-chain (avg)</div><div className={css.delta}><Arrow s={dBal.sign}/> {dBal.diff==null?'—':fmt(dBal.diff,3)} <span className={css.muted}>({dBal.pct==null?'—':fmt(dBal.pct,1)+'%'})</span></div></div>
           <Spark series={sBalEth} labels={labels} selected={selLocal} onSelect={setLocal} color="rgb(34,197,94)"/>
         </div>
-        )}
 
-        {hasAny(sVolUsd) && (
         <div className={css.card}>
           <div className={css.head}><div className={css.title}>Volume (USD)</div><div className={css.rank}>{cur?.ranks?.volume?.rank ? `Rank #${cur.ranks.volume.rank}` : '—'}</div></div>
           <div className={css.row}><div className={css.big}>${fmt(cur?.volume_usd,2)}</div><div className={css.sub}>swap + bridge</div><div className={css.delta}><Arrow s={dVol.sign}/> {dVol.diff==null?'—':`$${fmt(dVol.diff,2)}`} <span className={css.muted}>({dVol.pct==null?'—':fmt(dVol.pct,1)+'%'})</span></div></div>
           <Spark series={sVolUsd} labels={labels} selected={selLocal} onSelect={setLocal} color="rgb(59,130,246)"/>
         </div>
-        )}
 
-        {hasAny(sInter) && (
         <div className={css.card}>
           <div className={css.head}><div className={css.title}>Interactions</div><div className={css.rank}>{cur?.ranks?.activity?.rank ? `Rank #${cur.ranks.activity.rank}` : '—'}</div></div>
           <div className={css.row}><div className={css.big}>{(cur?.native_txs||0)+(cur?.token_txs||0)+(cur?.nft_unique_contracts||0)+(cur?.uniq_contracts||0)}</div><div className={css.sub}>total</div><div className={css.delta}><Arrow s={dInt.sign}/> {dInt.diff==null?'—':String(dInt.diff)} <span className={css.muted}>({dInt.pct==null?'—':fmt(dInt.pct,1)+'%'})</span></div></div>
           <Spark series={sInter} labels={labels} selected={selLocal} onSelect={setLocal} color="rgb(2,132,199)"/>
         </div>
-        )}
 
         {/* Row 2 */}
-        {hasAny(sAct) && (
         <div className={css.card}>
           <div className={css.head}><div className={css.title}>Activity</div><div className={css.rank}>{cur?.ranks?.activity?.rank ? `Rank #${cur.ranks.activity.rank}` : '—'}</div></div>
           <div className={css.kpis}>
@@ -234,9 +220,7 @@ export default function WalletFrames({ address }:{ address:string }) {
           <div className={css.delta}><Arrow s={dAct.sign}/> {dAct.diff==null?'—':String(dAct.diff)} <span className={css.muted}>({dAct.pct==null?'—':fmt(dAct.pct,1)+'%'})</span></div>
           <Spark series={sAct} labels={labels} selected={selLocal} onSelect={setLocal} color="rgb(234,179,8)"/>
         </div>
-        )}
 
-        {hasAny(sNftCnt) && (
         <div className={css.card}>
           <div className={css.head}><div className={css.title}>NFT Holders</div><div className={css.rank}>{cur?.ranks?.nft?.rank ? `Rank #${cur.ranks.nft.rank}` : '—'}</div></div>
           <div className={css.badgeRow}>
@@ -246,9 +230,7 @@ export default function WalletFrames({ address }:{ address:string }) {
           <div className={css.row}><div className={css.big}>{cur?.nft_unique_contracts ?? '—'}</div><div className={css.sub}>NFT contracts</div><div className={css.delta}><Arrow s={dNft.sign}/> {dNft.diff==null?'—':String(dNft.diff)} <span className={css.muted}>({dNft.pct==null?'—':fmt(dNft.pct,1)+'%'})</span></div></div>
           <Spark series={sNftCnt} labels={labels} selected={selLocal} onSelect={setLocal} color="rgb(99,102,241)"/>
         </div>
-        )}
 
-        {hasAny(sDays) && (
         <div className={css.card}>
           <div className={css.head}><div className={css.title}>Time & engagement</div><div className={css.rank}>—</div></div>
           <div className={css.kpis}>
@@ -259,18 +241,14 @@ export default function WalletFrames({ address }:{ address:string }) {
           <div className={css.delta}><Arrow s={dDays.sign}/> {dDays.diff==null?'—':String(dDays.diff)} <span className={css.muted}>({dDays.pct==null?'—':fmt(dDays.pct,1)+'%'})</span></div>
           <Spark series={sDays} labels={labels} selected={selLocal} onSelect={setLocal} color="rgb(147,51,234)"/>
         </div>
-        )}
 
         {/* Row 3 */}
-        {hasAny(sTokU) && (
         <div className={css.card}>
           <div className={css.head}><div className={css.title}>Unique Tokens Traded</div><div className={css.rank}>—</div></div>
           <div className={css.row}><div className={css.big}>{cur?.tokens_traded_unique ?? 0}</div><div className={css.sub}>this month</div><div className={css.delta}><Arrow s={dTokU.sign}/> {dTokU.diff==null?'—':String(dTokU.diff)} <span className={css.muted}>({dTokU.pct==null?'—':fmt(dTokU.pct,1)+'%'})</span></div></div>
           <Spark series={sTokU} labels={labels} selected={selLocal} onSelect={setLocal} color="rgb(20,184,166)"/>
         </div>
-        )}
 
-        {hasAny(sOvScore) && (
         <div className={css.card}>
           <div className={css.head}><div className={css.title}>Overall Ranking</div><div className={css.rank}>{rankCur ? `Rank #${rankCur}` : '—'}</div></div>
           <div className={css.row}>
@@ -280,9 +258,7 @@ export default function WalletFrames({ address }:{ address:string }) {
           </div>
           <Spark series={sOvScore} labels={labels} selected={selLocal} onSelect={setLocal} color="rgb(107,114,128)"/>
         </div>
-        )}
 
-        {hasAny(sGas) && (
         <div className={css.card}>
           <div className={css.head}><div className={css.title}>Gas Paid (ETH)</div><div className={css.rank}>—</div></div>
           <div className={css.row}>
@@ -294,7 +270,6 @@ export default function WalletFrames({ address }:{ address:string }) {
           </div>
           <Spark series={sGas} labels={labels} selected={selLocal} onSelect={setLocal} color="rgb(244,63,94)"/>
         </div>
-        )}
       </div>
     </div>
   )
