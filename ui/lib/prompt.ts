@@ -1,29 +1,37 @@
-// Build a final prompt string from selected traits and configuration.
+// lib/prompt.ts
+import type { SpeciesId } from './species';
+import { SPECIES_STYLE } from './species';
 
-import cfg from '../config/anime-cyberpunk.json';
-import type { LayerResult } from './types';
+type BuildPromptIn = {
+  species: SpeciesId;
+  traitsJson?: any;
+  persona?: any;
+};
 
-/**
- * Construct the full image prompt by replacing placeholders defined in the
- * template with the corresponding trait prompts. If a placeholder does not
- * have a matching trait, it is replaced with an empty string. A
- * `signature_clause` placeholder is optional and included only when the
- * signature trait exists.
- *
- * @param layers Mapping of layer names to trait picks
- */
-export function buildPrompt(layers: LayerResult): string {
-  const template: string = (cfg as any).prompt_template;
-  // Map placeholders to trait prompt snippets
-  const map: Record<string, string> = {
-    body: layers['Body']?.prompt ?? '',
-    clothing: layers['Clothing']?.prompt ?? '',
-    headwear: layers['Headwear']?.prompt ?? '',
-    eyes: layers['Eyes']?.prompt ?? '',
-    accessory: layers['Accessory']?.prompt ?? '',
-    aura: layers['Aura']?.prompt ?? '',
-    emblem: layers['Emblem']?.prompt ?? '',
-    signature_clause: layers['Signature'] ? ', ' + layers['Signature']!.prompt : ''
-  };
-  return template.replace(/\{(\w+)\}/g, (_, key: string) => map[key] ?? '');
+export function buildLockedPrompt({ species, traitsJson, persona }: BuildPromptIn) {
+  const ss = SPECIES_STYLE[species];
+  const stage = traitsJson?.stage || 'adult';
+  const tier  = traitsJson?.tier  ?? 0;
+
+  const vibe =
+    persona?.tone === 'hype' ? 'confident, energetic but tasteful' :
+    persona?.tone === 'builderish' ? 'calm, thoughtful, ship-first' :
+    'curious, steady';
+
+  const archetype =
+    (persona?.archetype || '').toString().toLowerCase() ||
+    (Array.isArray(persona?.traitsText) ? (persona.traitsText[0] || '') : '') ||
+    'explorer';
+
+  // Locked style + identity guard; model should preserve species identity from reference
+  const lines = [
+    `Base-native portrait, ${ss.camera} angle, symmetrical composition.`,
+    `Clean studio lighting, ultra-detailed, ${ss.paletteHint}.`,
+    `Subject: the ${ss.baseName} persona (keep silhouette and facial identity close to reference).`,
+    `Overall vibe: ${vibe}; archetype hint: ${archetype}.`,
+    `Stage hint: ${stage}; tier hint: ${tier}.`,
+    `Do not change species or camera; avoid clutter; tasteful UI glow allowed.`,
+  ];
+
+  return lines.join(' ');
 }

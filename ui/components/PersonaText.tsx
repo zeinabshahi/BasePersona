@@ -1,58 +1,33 @@
-import React from 'react'
+// components/PersonaText.tsx
+'use client';
 
-type Props = { narrative?: any; isLoading?: boolean }
+import React from 'react';
 
-function buildCopy(narrative?: any) {
-  const n = narrative?.narrativeJson ?? narrative ?? {}
-  const lines: string[] = []
-  if (n.title) lines.push(n.title)
-  if (n.oneLiner) lines.push(n.oneLiner)
-  if (n.summary) lines.push(n.summary)
-  if (typeof n === 'string' && !lines.length) lines.push(n)
-  if (Array.isArray(n.highlights) && n.highlights.length) {
-    lines.push('', 'Highlights:')
-    for (const h of n.highlights) lines.push(`• ${h}`)
+type PersonaCopy = {
+  title?: string;
+  oneLiner?: string;
+  summary?: string;
+  highlights?: string[];
+};
+
+export function PersonaText({ narrative, isLoading }: { narrative?: any; isLoading?: boolean }) {
+  if (isLoading) {
+    return <div style={{opacity:.75}}>Generating persona…</div>;
   }
-  if (Array.isArray(n.personalityTags) && n.personalityTags.length) {
-    lines.push('', 'Tags: ' + n.personalityTags.join(', '))
-  }
-  return lines.join('\n')
-}
-
-export function PersonaText({ narrative, isLoading }: Props) {
-  const copyText = buildCopy(narrative)
-
-  const defaultText = `This wallet has not been analyzed yet.
-
-Click "Analyze" to generate a concise on-chain persona for this address. The generated persona will include:
-• Overall activity level (active / inactive) and wallet age (days since first tx);
-• Native and token transaction counts;
-• ETH volume (30d and total);
-• Total and unique contract interactions;
-• NFT ownership summary (whether the wallet holds Base Builder / Base Introduced and how many unique NFT contracts it holds);
-• A short, shareable narrative sentence describing the wallet's on-chain behavior and personality.
-
-Analysis usually takes a few seconds depending on API latency. The full persona will appear here as soon as it's ready.`
-
-  const onCopy = async () => {
-    try { await navigator.clipboard.writeText(copyText || defaultText) } catch {}
-  }
+  const src = (narrative?.narrativeJson || narrative || {}) as PersonaCopy;
 
   return (
-    <div className="card">
-      <div className="cardHeader">
-        <h3>Persona</h3>
-        <div className="toolbar"><button className="chip" onClick={onCopy}>Copy</button></div>
-      </div>
-
-      <div className="personaText" style={{ padding: 14 }}>
-        {isLoading
-          ? <p className="personaLine"><b>Analyzing wallet…</b> Please wait a moment.</p>
-          : (copyText || defaultText).split('\n').map((l, i) => <p key={i} className="personaLine">{l}</p>)
-        }
-      </div>
+    <div>
+      {src.title && <div style={{ fontWeight: 800, fontSize: 18, marginBottom: 8 }}>{src.title}</div>}
+      {src.oneLiner && <div style={{ fontWeight: 600, marginBottom: 8 }}>{src.oneLiner}</div>}
+      {src.summary && <p style={{ margin: 0 }}>{src.summary}</p>}
+      {Array.isArray(src.highlights) && src.highlights.length > 0 && (
+        <ul style={{ marginTop: 12 }}>
+          {src.highlights.map((h, i) => <li key={i}>{h}</li>)}
+        </ul>
+      )}
     </div>
-  )
+  );
 }
 
-export default PersonaText
+export default PersonaText;

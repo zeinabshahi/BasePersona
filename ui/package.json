@@ -1,36 +1,37 @@
 {
-    "version":  "1.0.0",
-    "dependencies":  {
-                         "sharp":  "^0.33.5",
-                         "ethers":  "^6.15.0",
-                         "better-sqlite3":  "^12.4.1",
-                         "@wagmi/connectors":  "5.11.2",
-                         "@web3modal/wagmi":  "5.1.11",
-                         "wagmi":  "2.19.2",
-                         "web3.storage":  "^4.5.5",
-                         "next":  "14.2.5",
-                         "react":  "18.2.0",
-                         "viem":  "^2.38.0",
-                         "react-dom":  "18.2.0",
-                         "keccak256":  "1.0.6",
-                         "@tanstack/react-query":  "^5.90.2",
-                         "@tanstack/query-core":  "5.51.1"
-                     },
-    "name":  "base-persona-ui",
-    "type":  "commonjs",
-    "private":  true,
-    "engines":  {
-                    "node":  "\u003e=18 \u003c=20"
-                },
-    "scripts":  {
-                    "lint":  "next lint || exit 0",
-                    "build":  "next build",
-                    "dev":  "next dev",
-                    "start":  "next start -p 3000"
-                },
-    "devDependencies":  {
-                            "typescript":  "5.4.5",
-                            "@types/react":  "18.2.21",
-                            "@types/node":  "20.11.19"
-                        }
+    "version": "1.0.0",
+    "dependencies": {
+        "@tanstack/query-core": "5.51.1",
+        "@tanstack/react-query": "^5.90.2",
+        "@wagmi/connectors": "5.11.2",
+        "@web3modal/wagmi": "5.1.11",
+        "better-sqlite3": "^12.4.1",
+        "ethers": "^6.15.0",
+        "keccak256": "1.0.6",
+        "next": "14.2.5",
+        "react": "18.2.0",
+        "react-dom": "18.2.0",
+        "sharp": "^0.33.5",
+        "swr": "^2.3.6",
+        "viem": "^2.38.0",
+        "wagmi": "2.19.2",
+        "web3.storage": "^4.5.5"
+    },
+    "name": "base-persona-ui",
+    "type": "commonjs",
+    "private": true,
+    "engines": {
+        "node": ">=18 <=20"
+    },
+    "scripts": {
+        "lint": "next lint || exit 0",
+        "build": "next build",
+        "dev": "next dev",
+        "start": "next start -p 3000"
+    },
+    "devDependencies": {
+        "@types/node": "20.11.19",
+        "@types/react": "18.2.21",
+        "typescript": "5.4.5"
+    }
 }

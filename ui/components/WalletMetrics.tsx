@@ -1,7 +1,8 @@
-'use client'
+'use client';
 
-import * as React from 'react'
-import styles from './frames.module.css'
+import * as React from 'react';
+import useSWR from 'swr';
+import styles from './frames.module.css';
 
 type Rank = { rank: number; pct: number; score?: number }
 type Monthly = {
@@ -25,6 +26,8 @@ type Props = {
   address?: string
   selectedYm: number | null
   onMonthsLoaded?: (list: MonthOpt[]) => void
+  /** NEW: when user clicks a point in any chart, parent can update selectedYm */
+  onSelectionChange?: (ym: number) => void
 }
 
 const fmt = (n?: number, d = 2) => (n == null || Number.isNaN(n) ? '—' : Number(n).toFixed(d))
@@ -37,34 +40,110 @@ function delta(cur?: number, prev?: number) {
   return { diff, pct, sign: diff === 0 ? 0 : (diff > 0 ? 1 : -1) as -1 | 0 | 1 }
 }
 
-function Spark({ series, labels, selected, color }:{
-  series: number[]; labels: string[]; selected: number; color: string
-}) {
-  const w = 320, h = 96, pad = 10
-  const n = series.length
-  const xs = series.map((_, i) => pad + (n > 1 ? (i * (w - pad * 2)) / (n - 1) : 0))
-  const max = Math.max(0.0001, ...series)
-  const y = (v: number) => h - pad - (v / max) * (h - pad * 2)
-  const d = xs.map((x, i) => `${i ? 'L' : 'M'}${x.toFixed(1)},${y(series[i]).toFixed(1)}`).join(' ')
-  const area = `${d} L${xs[n - 1]?.toFixed(1) || pad},${(h - pad).toFixed(1)} L${xs[0]?.toFixed(1) || pad},${(h - pad).toFixed(1)} Z`
-  return (
-    <div className={styles.sparkWrap}>
-      <svg viewBox={`0 0 ${w} ${h}`} className={styles.spark} preserveAspectRatio="none">
-        <path d={area} style={{ fill: color.replace('rgb','rgba').replace(')',',.16)') }} />
-        <path d={d} style={{ stroke: color, strokeWidth: 2, fill: 'none' }} />
-        {xs.map((x, i) => (
-          <circle key={i} cx={x} cy={y(series[i])} r={i === selected ? 4 : 2}
-                  className={i === selected ? styles.dotSel : styles.dot}>
-            <title>{`${labels[i]} • ${series[i]}`}</title>
-          </circle>
-        ))}
-      </svg>
-    </div>
-  )
+/** Dropdown label: “YYYY-MM • Mon YYYY” */
+function longMonthLabel(m: string) {
+  const [y, mm] = m.split('-').map(x => parseInt(x, 10));
+  const dt = new Date(y, (mm || 1) - 1, 1);
+  const long = dt.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+  return `${m} • ${long}`;
 }
+/** Chart label: “Mon YYYY” (single-format, textual only) */
+function shortMonthLabel(m: string) {
+  const [y, mm] = m.split('-').map(x => parseInt(x, 10));
+  const dt = new Date(y, (mm || 1) - 1, 1);
+  return dt.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+}
+
+/** Spark chart with two-line tooltip and CLICKABLE points */
+function Spark({
+  series, labels, selected, color, tooltipLabel, onPick,
+}:{
+  series: number[]; labels: string[]; selected: number; color: string; tooltipLabel: string;
+  onPick?: (index: number) => void;
+}) {
+  const w = 320, h = 96, pad = 10;
+  const n = series.length;
+  const xs = series.map((_, i) => pad + (n > 1 ? (i * (w - pad * 2)) / (n - 1) : 0));
+  const max = Math.max(0.0001, ...series);
+  const y = (v: number) => h - pad - (v / max) * (h - pad * 2);
+  const d = xs.map((x, i) => `${i ? 'L' : 'M'}${x.toFixed(1)},${y(series[i]).toFixed(1)}`).join(' ');
+  const area = `${d} L${xs[n - 1]?.toFixed(1) || pad},${(h - pad).toFixed(1)} L${xs[0]?.toFixed(1) || pad},${(h - pad).toFixed(1)} Z`;
+
+  const fillSoft = color.replace('rgb', 'rgba').replace(')', ',.16)');
+  const dotFill = color.replace('rgb', 'rgba').replace(')', ',.95)');
+  const selStroke = '#ffffff';
+
+  return (
+    <div>
+      <div className={styles.sparkWrap}>
+        <svg viewBox={`0 0 ${w} ${h}`} className={styles.spark} preserveAspectRatio="none">
+          <path d={area} style={{ fill: fillSoft }} />
+          <path d={d} style={{ stroke: color, strokeWidth: 2, fill: 'none' }} />
+          {xs.map((x, i) => {
+            const selectedDot = i === selected;
+            const handleClick = () => onPick?.(i);
+            const handleKey = (e: React.KeyboardEvent<SVGCircleElement>) => {
+              if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onPick?.(i); }
+            };
+            return (
+              <g key={i}>
+                {/* larger invisible hit-area for easier clicks */}
+                <circle
+                  cx={x}
+                  cy={y(series[i])}
+                  r={8}
+                  style={{ fill: 'transparent', cursor: onPick ? 'pointer' : 'default' }}
+                  onClick={handleClick}
+                />
+                <circle
+                  cx={x}
+                  cy={y(series[i])}
+                  r={selectedDot ? 4 : 3}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`${labels[i]} • ${series[i]} ${tooltipLabel}`}
+                  onClick={handleClick}
+                  onKeyDown={handleKey}
+                  style={{
+                    fill: dotFill,
+                    stroke: selectedDot ? selStroke : 'none',
+                    strokeWidth: selectedDot ? 1.5 : 0,
+                    cursor: onPick ? 'pointer' : 'default',
+                    transition: 'r .1s',
+                  }}
+                >
+                  <title>{`${labels[i]}\n${series[i]} ${tooltipLabel}`}</title>
+                </circle>
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+      {/* Start / End dates under the chart */}
+      <div style={{display:'flex', justifyContent:'space-between', fontSize:12, opacity:.7, marginTop:4}}>
+        <span>{labels[0] || ''}</span>
+        <span>{labels[labels.length-1] || ''}</span>
+      </div>
+    </div>
+  );
+}
+
 const Arrow = ({ s }: { s: -1 | 0 | 1 }) =>
   s > 0 ? <span className={styles.up}>▲</span> : s < 0 ? <span className={styles.down}>▼</span> : <span className={styles.flat}>■</span>
 
+/** SWR fetcher with AbortController */
+const fetcher = (url: string) => {
+  const ctrl = new AbortController();
+  const p = fetch(url, { signal: ctrl.signal, cache: 'no-store' }).then(r => {
+    if (!r.ok) throw new Error(`metrics ${r.status}`);
+    return r.json();
+  });
+  // @ts-ignore
+  p.cancel = () => ctrl.abort();
+  return p as Promise<Payload>;
+};
+
+/** Demo payload if no address or fetch fails */
 function demoPayload(): Payload {
   const months: Monthly[] = []
   const base = new Date(); base.setMonth(base.getMonth() - 11)
@@ -90,41 +169,37 @@ function demoPayload(): Payload {
   return { summary: { active_months_total: months.length, wallet_age_days: 0, cum_ranks: { overall: { score: 0, rank: 0, pct: 0 } } }, monthly: months }
 }
 
-const WalletMetrics: React.FC<Props> = ({ address, selectedYm, onMonthsLoaded }) => {
-  const [data, setData] = React.useState<Payload | null>(null)
-  const [err, setErr] = React.useState<string | null>(null)
+const WalletMetrics: React.FC<Props> = ({ address, selectedYm, onMonthsLoaded, onSelectionChange }) => {
+  const key = React.useMemo(() => {
+    const ok = !!address && /^0x[a-fA-F0-9]{40}$/.test(address);
+    return ok ? `/api/metrics?address=${address.toLowerCase()}` : null;
+  }, [address]);
 
-  // fetch (همیشه اجرا می‌شود؛ نه داخل شرطی که hook-count را تغییر دهد)
+  const { data, error, isValidating } = useSWR<Payload>(key, fetcher, {
+    dedupingInterval: 30_000,
+    revalidateOnFocus: false,
+    revalidateOnReconnect: false,
+    shouldRetryOnError: false,
+  });
+
+  const dataOrDemo = React.useMemo<Payload>(() => {
+    if (!key) return demoPayload();
+    if (error) return demoPayload();
+    return data ?? demoPayload();
+  }, [key, data, error]);
+
+  // Send month list to parent with long labels (dropdown)
+  const onMonthsLoadedRef = React.useRef(onMonthsLoaded);
+  React.useEffect(() => { onMonthsLoadedRef.current = onMonthsLoaded }, [onMonthsLoaded]);
   React.useEffect(() => {
-    let off = false
-    ;(async () => {
-      setErr(null)
-      try {
-        if (!address || !/^0x[0-9a-fA-F]{40}$/.test(address)) {
-          const d = demoPayload()
-          if (!off) { setData(d); onMonthsLoaded?.(d.monthly.map(m => ({ ym: m.ym, label: m.month }))) }
-          return
-        }
-        const r = await fetch(`/api/metrics?address=${address.toLowerCase()}`)
-        if (!r.ok) throw new Error(`HTTP ${r.status}`)
-        const j = (await r.json()) as Payload
-        j.monthly.sort((a, b) => a.month.localeCompare(b.month))
-        if (!off) { setData(j); onMonthsLoaded?.(j.monthly.map(m => ({ ym: m.ym, label: m.month }))) }
-      } catch (e: any) {
-        if (!off) {
-          setErr(e?.message || 'fetch failed')
-          const d = demoPayload()
-          setData(d)
-          onMonthsLoaded?.(d.monthly.map(m => ({ ym: m.ym, label: m.month })))
-        }
-      }
-    })()
-    return () => { off = true }
-  }, [address, onMonthsLoaded])
+    const months = dataOrDemo.monthly || [];
+    const list = months.map(m => ({ ym: m.ym, label: longMonthLabel(m.month) }));
+    onMonthsLoadedRef.current?.(list);
+  }, [dataOrDemo]);
 
-  // از اینجا به بعد، حتی اگر data نداشته باشیم، با مقادیر پیش‌فرض محاسبه می‌کنیم تا شمار هوک‌ها ثابت بماند
-  const months = data?.monthly ?? []
-  const labels = React.useMemo(() => months.map(m => m.month), [months])
+  const months = dataOrDemo.monthly ?? [];
+  // Charts use single-format textual labels
+  const labels = React.useMemo(() => months.map(m => shortMonthLabel(m.month)), [months]);
 
   const selIndex = React.useMemo(() => {
     if (months.length === 0) return 0
@@ -174,12 +249,18 @@ const WalletMetrics: React.FC<Props> = ({ address, selectedYm, onMonthsLoaded })
     return { diff, pct: null, sign: diff === 0 ? 0 : (diff > 0 ? 1 : -1) as -1 | 0 | 1 }
   })()
 
+  const pickIndex = React.useCallback((i: number) => {
+    const ym = months[i]?.ym;
+    if (ym && onSelectionChange) onSelectionChange(ym);
+  }, [months, onSelectionChange]);
+
   const Card = ({
-    title, value, unit, deltaObj, series, labels, color, subtitle, footNote,
+    title, value, unit, deltaObj, series, labels, color, subtitle, footNote, tooltipLabel,
   }: {
     title: string; value: string; unit?: string;
     deltaObj?: { diff: number | null; pct: number | null; sign: -1 | 0 | 1 } | null;
     series: number[]; labels: string[]; color: string; subtitle?: string; footNote?: string;
+    tooltipLabel: string;
   }) => (
     <div className={styles.card}>
       <div className={styles.head}>
@@ -197,15 +278,21 @@ const WalletMetrics: React.FC<Props> = ({ address, selectedYm, onMonthsLoaded })
             : '—'}
         </div>
       </div>
-      <Spark series={series} labels={labels} selected={Math.max(0, Math.min(series.length - 1, selIndex))} color={color} />
+      <Spark
+        series={series}
+        labels={labels}
+        selected={selIndex}
+        color={color}
+        tooltipLabel={tooltipLabel}
+        onPick={pickIndex}
+      />
     </div>
   )
 
-  // UI: اگر هنوز داده نداریم، با اسکلتون ساده نشون بده ولی هوک‌ها ثابت موندند
-  if (!data) {
+  if (!data && !error) {
     return (
       <div className={styles.grid}>
-        <div className={styles.card}><div className={styles.title}>Loading…</div></div>
+        <div className={styles.card}><div className={styles.title}>Loading metrics…</div></div>
       </div>
     )
   }
@@ -213,25 +300,26 @@ const WalletMetrics: React.FC<Props> = ({ address, selectedYm, onMonthsLoaded })
   return (
     <div className={styles.grid}>
       <Card title="Balance (ETH)" value={fmt(V.balance, 3)} deltaObj={dBalance ?? undefined}
-            series={sBal} labels={labels} color="rgb(59,130,246)" subtitle="on-chain (avg)" />
+            series={sBal} labels={labels} color="rgb(59,130,246)" subtitle="on-chain (avg)" tooltipLabel="ETH balance" />
       <Card title="Trades (count)" value={fmt(V.trades, 0)} deltaObj={dTrades ?? undefined}
-            series={sTrades} labels={labels} color="rgb(16,185,129)" subtitle="swap/trade tx count" />
+            series={sTrades} labels={labels} color="rgb(16,185,129)" subtitle="swap/trade tx count" tooltipLabel="trades" />
       <Card title="Transactions" value={fmt(V.txs, 0)} deltaObj={dTxs ?? undefined}
-            series={sTxs} labels={labels} color="rgb(37,99,235)" subtitle="txs per month" />
+            series={sTxs} labels={labels} color="rgb(37,99,235)" subtitle="txs per month" tooltipLabel="transactions" />
       <Card title="Unique Contracts" value={fmt(V.uniq, 0)} deltaObj={dUniq ?? undefined}
-            series={sUniq} labels={labels} color="rgb(234,179,8)" subtitle="per month" />
+            series={sUniq} labels={labels} color="rgb(234,179,8)" subtitle="per month" tooltipLabel="unique contracts" />
       <Card title="Active Days" value={fmt(V.days, 0)} deltaObj={dDays ?? undefined}
-            series={sDays} labels={labels} color="rgb(147,51,234)" subtitle="per month" />
+            series={sDays} labels={labels} color="rgb(147,51,234)" subtitle="per month" tooltipLabel="active days" />
       <Card title="Best Streak (days)" value={fmt(V.streak, 0)} deltaObj={dStreak ?? undefined}
-            series={sStreak} labels={labels} color="rgb(245,158,11)" subtitle="within month" />
+            series={sStreak} labels={labels} color="rgb(245,158,11)" subtitle="within month" tooltipLabel="best streak (days)" />
       <Card title="Gas Paid (ETH)" value={fmt(V.gas, 4)} deltaObj={dGas ?? undefined}
-            series={sGas} labels={labels} color="rgb(244,63,94)" subtitle={modeAllTime ? "all-time" : "this month"} />
+            series={sGas} labels={labels} color="rgb(244,63,94)" subtitle={selectedYm==null ? "all-time" : "this month"} tooltipLabel="ETH gas" />
       <Card title="NFT (count)" value={fmt(V.nft, 0)} deltaObj={dNft ?? undefined}
-            series={sNft} labels={labels} color="rgb(99,102,241)" subtitle="unique NFT contracts" />
+            series={sNft} labels={labels} color="rgb(99,102,241)" subtitle="unique NFT contracts" tooltipLabel="NFT contracts" />
       <Card title="Monthly Rank" value={V.rank ? `#${fmt(V.rank, 0)}` : '—'} deltaObj={dRank ?? undefined}
-            series={sRank} labels={labels} color="rgb(107,114,128)" subtitle="better is lower" />
+            series={sRank} labels={labels} color="rgb(107,114,128)" subtitle="better is lower" tooltipLabel="rank (lower is better)" />
+      {isValidating && <div className={styles.muted} style={{gridColumn:'1 / -1'}}>Refreshing…</div>}
     </div>
   )
 }
 
-export default WalletMetrics
+export default WalletMetrics;

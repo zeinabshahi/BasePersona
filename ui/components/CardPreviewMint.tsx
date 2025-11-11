@@ -1,13 +1,28 @@
-'use client'
+'use client';
 
-import React, { useEffect, useState } from 'react'
-import { useAccount, useReadContract, useWriteContract } from 'wagmi'
-import { keccak256, formatEther } from 'viem'
-import { bmImage721Abi } from '../lib/abi/BMImage721'
-import { gateAbi } from '../lib/abi/gate'
+import React, { useEffect, useState } from 'react';
+import { useAccount, useReadContract, useWriteContract } from 'wagmi';
+import { keccak256, formatEther } from 'viem';
+import { bmImage721Abi } from '../lib/abi/BMImage721';
+import { gateAbi } from '../lib/abi/gate';
 
-type Stat = { label: string; value: string }
-type GenerateArgs = { prompt: string }
+type Stat = { label: string; value: string };
+
+type Props = {
+  // UI bits
+  defaultPrompt: string;   // only for transparency display; server builds a locked prompt
+  title?: string;
+  subtitle?: string;
+  stats?: Stat[];
+  badgeText?: string;
+  placeholderSrc?: string;
+  logoHref?: string;
+
+  // NEW: inputs for /api/generate (address/species resolved server-side)
+  address?: string;        // if not provided, fallback to connected wallet
+  traitsJson?: any;        // pass-through to server (optional)
+  persona?: any;           // pass-through to server (optional)
+};
 
 // ---------- Small utils ----------
 const btn = (grad: string): React.CSSProperties => ({
@@ -24,54 +39,61 @@ const btn = (grad: string): React.CSSProperties => ({
   fontWeight: 700,
   cursor: 'pointer',
   minWidth: 150,
-})
-const btnDisabled: React.CSSProperties = { opacity: 0.5, cursor: 'not-allowed' }
+});
+const btnDisabled: React.CSSProperties = { opacity: 0.5, cursor: 'not-allowed' };
 
 function safeAtob(b64: string): string {
-  if (typeof window !== 'undefined' && typeof window.atob === 'function') return window.atob(b64)
-  // Node/SSR fallback
-  return ''
+  try {
+    if (typeof window !== 'undefined' && typeof window.atob === 'function') {
+      return window.atob(b64);
+    }
+    // Node/SSR fallback
+    // @ts-ignore
+    return Buffer.from(b64, 'base64').toString('binary');
+  } catch {
+    return '';
+  }
 }
 
 function dataUrlBytes(dataUrl: string): Uint8Array {
-  const b64 = dataUrl.split(',')[1] || ''
-  const bin = safeAtob(b64)
-  const arr = new Uint8Array(bin.length)
-  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i)
-  return arr
+  const b64 = dataUrl.split(',')[1] || '';
+  const bin = safeAtob(b64);
+  const arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  return arr;
 }
 
-// نمایش ETH با گرد کردن تا ۶ رقم اعشار
+// Pretty ETH string (rounded)
 function fmtEth(wei: unknown, decimals = 6): string {
   try {
-    const s = formatEther(toBigIntSafe(wei))
-    const n = Number(s)
-    return n.toFixed(decimals).replace(/\.?0+$/, '')
-  } catch { return '0' }
+    const s = formatEther(toBigIntSafe(wei));
+    const n = Number(s);
+    return n.toFixed(decimals).replace(/\.?0+$/, '');
+  } catch { return '0'; }
 }
 
 function toBigIntSafe(x: unknown): bigint {
   try {
-    if (typeof x === 'bigint') return x
-    if (typeof x === 'number') return BigInt(Math.trunc(x))
-    if (typeof x === 'string' && x.trim() !== '') return BigInt(x)
+    if (typeof x === 'bigint') return x;
+    if (typeof x === 'number') return BigInt(Math.trunc(x));
+    if (typeof x === 'string' && x.trim() !== '') return BigInt(x);
     if (x && typeof x === 'object' && '_hex' in (x as any)) {
-      const hex = (x as any)._hex as string
-      return BigInt(hex)
+      const hex = (x as any)._hex as string;
+      return BigInt(hex);
     }
   } catch {}
-  return 0n
+  return 0n;
 }
 
 function toNumberSafe(x: unknown, fallback = 0): number {
-  if (x == null) return fallback
-  if (typeof x === 'number') return x
-  if (typeof x === 'bigint') return Number(x)
-  const n = Number(x as any)
-  return Number.isFinite(n) ? n : fallback
+  if (x == null) return fallback;
+  if (typeof x === 'number') return x;
+  if (typeof x === 'bigint') return Number(x);
+  const n = Number(x as any);
+  return Number.isFinite(n) ? n : fallback;
 }
 
-// ---------- Build SVG overlay string (to be composed on server)
+// ---------- Build SVG overlay (client-side string; server composes on top of the base image)
 function buildOverlaySVG(
   title: string | undefined,
   addressStr: string | undefined,
@@ -79,21 +101,21 @@ function buildOverlaySVG(
   badgeText: string | undefined,
   logoHref: string = '/base_logo.svg'
 ): string {
-  const pad = 48
-  const line = 44
-  const max = Math.min(6, stats.length)
+  const pad = 48;
+  const line = 44;
+  const max = Math.min(6, stats.length);
 
   const rows = Array.from({ length: max })
     .map((_, i) => {
-      const y = 1024 - pad - 20 - (max - 1 - i) * line
-      const s = stats[i]
+      const y = 1024 - pad - 20 - (max - 1 - i) * line;
+      const s = stats[i];
       return `
         <text x="${pad}" y="${y}" style="font:500 28px Inter,Segoe UI,Arial; fill: rgba(255,255,255,.95)">
           ${escapeXml(s.label)}:
           <tspan style="font-weight:700">${escapeXml(s.value)}</tspan>
-        </text>`
+        </text>`;
     })
-    .join('\n')
+    .join('\n');
 
   const badge = badgeText
     ? `
@@ -102,15 +124,15 @@ function buildOverlaySVG(
     <text x="891" y="62" text-anchor="middle" style="font:700 22px Inter; fill: rgba(255,215,0,0.95)">
       ${escapeXml(badgeText)}
     </text>`
-    : ''
+    : '';
 
   const titleEl = title
     ? `<text x="${pad}" y="${pad + 10}" style="font:800 40px Inter,Segoe UI,Arial; fill:#fff">${escapeXml(title)}</text>`
-    : ''
+    : '';
 
   const addrEl = addressStr
     ? `<text x="${pad}" y="${pad + (title ? 52 : 50)}" style="font:600 26px Inter,Segoe UI,Arial; fill:rgba(255,255,255,.9)">${escapeAddress(addressStr)}</text>`
-    : ''
+    : '';
 
   return `
 <svg viewBox="0 0 1024 1024" preserveAspectRatio="none" width="1024" height="1024" xmlns="http://www.w3.org/2000/svg">
@@ -134,18 +156,17 @@ function buildOverlaySVG(
   ${titleEl}
   ${addrEl}
   ${rows}
-</svg>`.trim()
+</svg>`.trim();
 }
 
 function escapeXml(s: string): string {
-  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 function escapeAddress(s: string): string {
-  // keep ellipsis visually; escape only XML special chars
-  return escapeXml(s)
+  return escapeXml(s);
 }
 
-// ---------- Live overlay component (for on-page preview)
+// ---------- Live overlay for on-page preview ----------
 function LiveOverlay({
   title,
   addressStr,
@@ -153,24 +174,24 @@ function LiveOverlay({
   badgeText,
   logoHref = '/base_logo.svg',
 }: {
-  title?: string
-  addressStr?: string
-  stats: Stat[]
-  badgeText?: string
-  logoHref?: string
+  title?: string;
+  addressStr?: string;
+  stats: Stat[];
+  badgeText?: string;
+  logoHref?: string;
 }) {
-  const pad = 48
-  const line = 44
-  const n = Math.min(6, stats.length)
+  const pad = 48;
+  const line = 44;
+  const n = Math.min(6, stats.length);
   const rows = Array.from({ length: n }).map((_, i) => {
-    const y = 1024 - pad - 20 - (n - 1 - i) * line
-    const s = stats[i]
+    const y = 1024 - pad - 20 - (n - 1 - i) * line;
+    const s = stats[i];
     return (
       <text key={i} x={pad} y={y} style={{ font: '500 28px Inter,Segoe UI,Arial', fill: 'rgba(255,255,255,.95)' }}>
         {s.label}: <tspan style={{ fontWeight: 700 }}>{s.value}</tspan>
       </text>
-    )
-  })
+    );
+  });
 
   return (
     <svg viewBox="0 0 1024 1024" preserveAspectRatio="none" width="100%" height="100%">
@@ -217,7 +238,7 @@ function LiveOverlay({
 
       {rows}
     </svg>
-  )
+  );
 }
 
 export default function CardPreviewMint({
@@ -228,130 +249,132 @@ export default function CardPreviewMint({
   badgeText = 'ALL-TIME',
   placeholderSrc = '/persona_placeholder.png',
   logoHref = '/base_logo.svg',
-}: {
-  defaultPrompt: string
-  title?: string
-  subtitle?: string
-  stats?: Stat[]
-  badgeText?: string
-  placeholderSrc?: string
-  logoHref?: string
-}) {
-  const { address } = useAccount()
+  // NEW props (optional)
+  address: addressProp,
+  traitsJson,
+  persona,
+}: Props) {
+  const { address: connected } = useAccount();
 
-  const CONTRACT = process.env.NEXT_PUBLIC_CONTRACT as `0x${string}`
-  const GATE = (process.env.NEXT_PUBLIC_GATE || '') as `0x${string}` | ''
+  const CONTRACT = process.env.NEXT_PUBLIC_CONTRACT as `0x${string}`;
+  const GATE = (process.env.NEXT_PUBLIC_GATE || '') as `0x${string}` | '';
 
-  // خواندن امن (مشروط) از زنجیره
+  // On-chain reads
   const { data: mintFeeWei } = useReadContract({
     address: CONTRACT,
     abi: bmImage721Abi as any,
     functionName: 'mintFeeWei',
     query: { enabled: Boolean(CONTRACT) },
-  })
+  });
   const { data: nextNonce } = useReadContract({
     address: CONTRACT,
     abi: bmImage721Abi as any,
     functionName: 'nonces',
-    args: [(address as any) || '0x0000000000000000000000000000000000000000'],
-    query: { enabled: Boolean(CONTRACT && address) },
-  })
+    args: [((connected as any) || '0x0000000000000000000000000000000000000000')],
+    query: { enabled: Boolean(CONTRACT && connected) },
+  });
 
-  // Gate: gen fee + quota
+  // Gate reads (optional)
   const { data: genFeeWei } = useReadContract({
     address: GATE || undefined,
     abi: gateAbi as any,
     functionName: 'genFeeWei',
     query: { enabled: Boolean(GATE) },
-  })
+  });
   const { data: gateCap } = useReadContract({
     address: GATE || undefined,
     abi: gateAbi as any,
     functionName: 'dailyCap',
     query: { enabled: Boolean(GATE) },
-  })
+  });
   const { data: gateRemain } = useReadContract({
     address: GATE || undefined,
     abi: gateAbi as any,
     functionName: 'remainingToday',
-    args: [(address as any) || '0x0000000000000000000000000000000000000000'],
-    query: { enabled: Boolean(GATE && address) },
-  })
+    args: [((connected as any) || '0x0000000000000000000000000000000000000000')],
+    query: { enabled: Boolean(GATE && connected) },
+  });
 
-  const { writeContractAsync } = useWriteContract()
+  const { writeContractAsync } = useWriteContract();
 
-  const [baseImg, setBaseImg] = useState<string | null>(null)
-  const [cardImg, setCardImg] = useState<string | null>(null)   // gateway URL (https://...) after compose-store
-  const [cardHash, setCardHash] = useState<string | null>(null) // 0x... sha256 from server
-  const [tokenUri, setTokenUri] = useState<string | null>(null) // ipfs://... metadata
-  const [busy, setBusy] = useState<{ gen?: boolean; compose?: boolean; mint?: boolean; paying?: boolean }>({})
-  const [error, setError] = useState<string | null>(null)
-  const [payTx, setPayTx] = useState<string | null>(null)
-  const [mintTx, setMintTx] = useState<string | null>(null)
+  const [baseImg, setBaseImg] = useState<string | null>(null);  // data URL produced by /api/generate
+  const [cardImg, setCardImg] = useState<string | null>(null);  // gateway URL after compose-store
+  const [cardHash, setCardHash] = useState<string | null>(null); // sha256 hex from server
+  const [tokenUri, setTokenUri] = useState<string | null>(null); // ipfs:// metadata
+  const [busy, setBusy] = useState<{ gen?: boolean; compose?: boolean; mint?: boolean; paying?: boolean }>({});
+  const [error, setError] = useState<string | null>(null);
+  const [payTx, setPayTx] = useState<string | null>(null);
+  const [mintTx, setMintTx] = useState<string | null>(null);
 
-  // USD اختیاری
-  const [ethUsd, setEthUsd] = useState<number | null>(null)
+  // Optional: USD price
+  const [ethUsd, setEthUsd] = useState<number | null>(null);
   useEffect(() => {
-    let alive = true
+    let alive = true;
     const load = async () => {
       try {
-        const j = await fetch('/api/eth-usd').then(r => r.json())
-        if (alive && j?.ok && typeof j.usd === 'number') setEthUsd(j.usd)
+        const j = await fetch('/api/eth-usd').then(r => r.json());
+        if (alive && j?.ok && typeof j.usd === 'number') setEthUsd(j.usd);
       } catch {}
-    }
-    load()
-    const id = setInterval(load, 60_000)
-    return () => { alive = false; clearInterval(id) }
-  }, [])
+    };
+    load();
+    const id = setInterval(load, 60_000);
+    return () => { alive = false; clearInterval(id); };
+  }, []);
 
-  const preview = cardImg || baseImg || placeholderSrc
-  const showLiveOverlay = !cardImg
+  const effectiveAddress = addressProp || connected || '';
+  const preview = cardImg || baseImg || placeholderSrc;
+  const showLiveOverlay = !cardImg;
 
-  const mintFeeEth = fmtEth(mintFeeWei)
-  const genFeeEth  = fmtEth(genFeeWei)
+  const mintFeeEth = fmtEth(mintFeeWei);
+  const genFeeEth  = fmtEth(genFeeWei);
   const genFeeUsd  = (ethUsd != null && genFeeWei != null)
     ? Number(formatEther(toBigIntSafe(genFeeWei))) * ethUsd
-    : null
+    : null;
 
-  // Quota (حتی بدون Gate → پیش‌فرض)
-  const cap = toNumberSafe(gateCap, 2)
-  const rem = toNumberSafe(gateRemain, cap)
-  const used = Math.max(0, cap - rem)
-  const pct  = Math.max(0, Math.min(100, Math.round((used / (cap || 1)) * 100)))
-  const quotaStr = `${used}/${cap} today`
+  // Daily quota
+  const cap = toNumberSafe(gateCap, 2);
+  const rem = toNumberSafe(gateRemain, cap);
+  const used = Math.max(0, cap - rem);
+  const pct  = Math.max(0, Math.min(100, Math.round((used / (cap || 1)) * 100)));
+  const quotaStr = `${used}/${cap} today`;
 
   async function parseJsonOrText(r: Response) {
-    const ct = r.headers.get('content-type') || ''
-    const text = await r.text()
+    const ct = r.headers.get('content-type') || '';
+    const text = await r.text();
     if (ct.includes('application/json')) {
-      try { return JSON.parse(text) } catch {}
+      try { return JSON.parse(text); } catch {}
     }
-    throw new Error(`API ${r.status} ${ct}: ${text.slice(0, 180)}`)
+    throw new Error(`API ${r.status} ${ct}: ${text.slice(0, 180)}`);
   }
 
   function downloadFile(url: string, filename: string) {
-    const a = document.createElement('a')
-    a.href = url
-    a.download = filename
-    document.body.appendChild(a)
-    a.click()
-    a.remove()
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
   }
 
-  // --- Pay + Generate ---
-  async function generateBase(args: GenerateArgs) {
-    setError(null)
+  // --- Pay (optional) + Generate via /api/generate (uses species base image as reference) ---
+  async function handleGenerate() {
+    setError(null);
 
-    // سهمیه روزانه
-    if (GATE && gateRemain !== undefined && toNumberSafe(gateRemain) === 0) {
-      setError('Daily generate limit reached. Try again tomorrow.')
-      return
+    if (!effectiveAddress || !/^0x[0-9a-fA-F]{40}$/.test(effectiveAddress)) {
+      setError('Connect wallet or enter a valid address first.');
+      return;
     }
 
-    // پرداخت
-    let payHash: string | null = null
+    // Gate: enforce daily quota (if configured)
+    if (GATE && gateRemain !== undefined && toNumberSafe(gateRemain) === 0) {
+      setError('Daily generate limit reached. Try again tomorrow.');
+      return;
+    }
+
+    // Optional payment (Gate)
+    let payHash: string | null = null;
     if (GATE && genFeeWei != null) {
-      setBusy(b => ({ ...b, paying: true }))
+      setBusy(b => ({ ...b, paying: true }));
       try {
         const txHash = await writeContractAsync({
           address: GATE,
@@ -359,124 +382,129 @@ export default function CardPreviewMint({
           functionName: 'payGenerate',
           args: [],
           value: toBigIntSafe(genFeeWei),
-        })
-        payHash = String(txHash)
-        setPayTx(payHash)
+        });
+        payHash = String(txHash);
+        setPayTx(payHash);
       } catch (e: any) {
-        setBusy(b => ({ ...b, paying: false }))
-        setError(String(e?.message || e))
-        return
+        setBusy(b => ({ ...b, paying: false }));
+        setError(String(e?.message || e));
+        return;
       }
-      setBusy(b => ({ ...b, paying: false }))
+      setBusy(b => ({ ...b, paying: false }));
     }
 
-    // ساخت تصویر
-    setBusy(b => ({ ...b, gen: true }))
+    // Call our image API (server uses locked prompt + species base reference)
+    setBusy(b => ({ ...b, gen: true }));
     try {
-      const r = await fetch('/api/v1/image', {
+      const r = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
+        cache: 'no-store',
         body: JSON.stringify({
-          prompt: args.prompt,
-          size: '1024x1024',
-          highDetail: false,
-          payTxHash: payHash,
+          address: effectiveAddress,
+          traitsJson: traitsJson ?? null,
+          persona: persona ?? null,
+          // payTxHash is optional (ignored server-side unless you wire it)
+          payTxHash: payHash || undefined,
         }),
-      })
-      const j = await parseJsonOrText(r)
-      if (!j?.ok) throw new Error(j?.error || 'image_failed')
-      setBaseImg(j.imageURL); setCardImg(null); setCardHash(null); setTokenUri(null); setMintTx(null)
+      });
+      const j = await parseJsonOrText(r);
+      if (!j?.ok || !j?.imageURL) throw new Error(j?.error || 'generate_failed');
+      setBaseImg(j.imageURL);
+      setCardImg(null);
+      setCardHash(null);
+      setTokenUri(null);
+      setMintTx(null);
     } catch (e: any) {
-      setError(String(e?.message || e))
+      setError(String(e?.message || e));
     } finally {
-      setBusy(b => ({ ...b, gen: false }))
+      setBusy(b => ({ ...b, gen: false }));
     }
   }
 
   // --- Compose → Store(IPFS) ---
   async function composeCard() {
-    if (!baseImg || !address) { setError('Generate first (and connect wallet).'); return }
-    setBusy(b => ({ ...b, compose: true })); setError(null)
+    if (!baseImg || !effectiveAddress) { setError('Generate first (and connect wallet).'); return; }
+    setBusy(b => ({ ...b, compose: true })); setError(null);
     try {
       const svg = buildOverlaySVG(
         title,
-        subtitle || (address ? `${address.slice(0,6)}…${address.slice(-4)}` : ''),
+        subtitle || (effectiveAddress ? `${effectiveAddress.slice(0,6)}…${effectiveAddress.slice(-4)}` : ''),
         stats,
         badgeText,
         logoHref
-      )
+      );
 
       const r = await fetch('/api/compose-store', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
-          from: address,
+          from: effectiveAddress,
           baseImage: baseImg,   // data:/http(s)/ipfs://
           overlaySVG: svg,      // SVG string
           name: 'MegaPersona Card',
           description: 'Deterministic persona generated from on-chain activity.',
           attributes: stats.map(s => ({ trait_type: s.label, value: s.value })),
-          external_url: window.location.origin + `/nft/${address}`,
+          external_url: window.location.origin + `/nft/${effectiveAddress}`,
         }),
-      })
-      const j = await parseJsonOrText(r)
-      if (!j?.ok) throw new Error(j?.error || 'compose_failed')
+      });
+      const j = await parseJsonOrText(r);
+      if (!j?.ok) throw new Error(j?.error || 'compose_failed');
 
       // server returns { image: { gateway }, tokenUri, imageHash }
-      setCardImg(j.image?.gateway || null)
-      setCardHash(j.imageHash || null)
-      setTokenUri(j.tokenUri || null)
-      setMintTx(null)
+      setCardImg(j.image?.gateway || null);
+      setCardHash(j.imageHash || null);
+      setTokenUri(j.tokenUri || null);
+      setMintTx(null);
     } catch (e: any) {
-      setError(String(e?.message || e))
+      setError(String(e?.message || e));
     } finally {
-      setBusy(b => ({ ...b, compose: false }))
+      setBusy(b => ({ ...b, compose: false }));
     }
   }
 
   // --- Sign → Claim ---
   async function uploadSignMint() {
-    if (!cardImg || !tokenUri) { setError('Compose card first'); return }
-    if (!address) { setError('Connect wallet first'); return }
+    if (!cardImg || !tokenUri) { setError('Compose card first.'); return; }
+    if (!effectiveAddress) { setError('Connect wallet first.'); return; }
 
-    setBusy(b => ({ ...b, mint: true })); setError(null)
+    setBusy(b => ({ ...b, mint: true })); setError(null);
     try {
       // 1) deadline + nonce
-      const deadline = Math.floor(Date.now()/1000) + 3600
-      const nonce = Number(nextNonce || 0)
+      const deadline = Math.floor(Date.now()/1000) + 3600;
+      const nonce = Number(nextNonce || 0);
 
-      // imageHash از compose-store آمده؛ اگر نبود، fallback keccak از dataURL
-      let imageHash = cardHash
+      // imageHash from compose-store; fallback to keccak(dataURL)
+      let imageHash = cardHash;
       if (!imageHash && cardImg.startsWith('data:')) {
-        imageHash = keccak256(dataUrlBytes(cardImg))
+        imageHash = keccak256(dataUrlBytes(cardImg));
       }
-      if (!imageHash) throw new Error('missing image hash')
+      if (!imageHash) throw new Error('missing image hash');
 
-      // 2) امضا
+      // 2) signature (server-side)
       const sc = await fetch('/api/sign-claim', {
         method:'POST', headers:{'content-type':'application/json'},
-        body: JSON.stringify({ to: address, tokenURI: tokenUri, imageHash, deadline, nonce })
-      }).then(parseJsonOrText)
-      if (!sc?.sig) throw new Error(sc?.error || 'sign_claim_failed')
+        body: JSON.stringify({ to: effectiveAddress, tokenURI: tokenUri, imageHash, deadline, nonce })
+      }).then(parseJsonOrText);
+      if (!sc?.sig) throw new Error(sc?.error || 'sign_claim_failed');
 
-      // 3) value (اگر payable باشد)
-      const value = toBigIntSafe(mintFeeWei)
+      // 3) payable value
+      const value = toBigIntSafe(mintFeeWei);
 
       // 4) claim
-      const args = [ { to: address, tokenURI: tokenUri, imageHash, deadline, nonce }, sc.sig ] as any
+      const args = [ { to: effectiveAddress, tokenURI: tokenUri, imageHash, deadline, nonce }, sc.sig ] as any;
       const txHash = await writeContractAsync({
         address: CONTRACT, abi: bmImage721Abi as any, functionName: 'claim', args, value
-      })
-      setMintTx(String(txHash))
-      if (typeof window !== 'undefined') window.alert('Mint tx sent: ' + txHash)
+      });
+      setMintTx(String(txHash));
+      if (typeof window !== 'undefined') window.alert('Mint tx sent: ' + txHash);
     } catch(e:any) {
-      setError(String(e?.message || e))
+      setError(String(e?.message || e));
     } finally {
-      setBusy(b=>({ ...b, mint:false }))
+      setBusy(b=>({ ...b, mint:false }));
     }
   }
 
-  // ---------- Small helpers for UI ----------
   const Frame: React.FC<{ title: string; value: React.ReactNode; canButton?: boolean; onClick?: ()=>void }> = ({ title, value, canButton, onClick }) => (
     canButton ? (
       <button onClick={onClick}
@@ -497,15 +525,14 @@ export default function CardPreviewMint({
         <div style={{fontSize:14, fontWeight:800}}>{value}</div>
       </div>
     )
-  )
+  );
 
-  // ---------- Render ----------
   return (
     <div className="grid gap-3">
       {/* Buttons */}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(3, minmax(0, 1fr))', gap: 10, alignItems:'center' }}>
         <button
-          onClick={()=>generateBase({ prompt: defaultPrompt })}
+          onClick={handleGenerate}
           disabled={!!busy.gen || !!busy.paying || (!!GATE && gateRemain!==undefined && toNumberSafe(gateRemain)===0)}
           style={{ ...btn('linear-gradient(135deg,#7c3aed,#2563eb)'), ...((busy.gen||busy.paying||((!!GATE) && gateRemain!==undefined && toNumberSafe(gateRemain)===0))?btnDisabled:{}) }}
           title={GATE ? 'Pay & Generate' : 'Generate'}
@@ -555,11 +582,11 @@ export default function CardPreviewMint({
       {/* Preview */}
       <div style={{ width:'100%', maxWidth:520, aspectRatio:'1 / 1', borderRadius:20, border:'1px solid rgba(0,0,0,0.08)', overflow:'hidden', position:'relative' }}>
         <img src={preview} alt="preview" style={{ width:'100%', height:'100%', objectFit:'cover', display:'block' }} />
-        {showLiveOverlay && (
+        {!cardImg && (
           <div style={{ position:'absolute', inset:0, pointerEvents:'none' }}>
             <LiveOverlay
               title={title}
-              addressStr={subtitle || (address ? `${address.slice(0,6)}…${address.slice(-4)}` : '')}
+              addressStr={subtitle || (effectiveAddress ? `${effectiveAddress.slice(0,6)}…${effectiveAddress.slice(-4)}` : '')}
               stats={stats}
               badgeText={badgeText}
               logoHref={logoHref}
@@ -571,5 +598,5 @@ export default function CardPreviewMint({
       {/* After mint badge */}
       {mintTx && <div className="badge">Mint tx: {mintTx.slice(0,10)}…</div>}
     </div>
-  )
+  );
 }
