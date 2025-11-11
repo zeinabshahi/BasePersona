@@ -32,18 +32,30 @@ type WalletMetricsProps = {
   onSelectionChange?: (ym: number) => void
 }
 
+/** CardPreviewMint props (to satisfy TS for dynamic import) */
+type CardStat = { label: string; value: string }
+type CardPreviewMintProps = {
+  defaultPrompt: string
+  title?: string
+  subtitle?: string
+  stats: CardStat[]
+  badgeText?: string
+  logoHref?: string
+  onMintClick?: () => void
+}
+
 /** Dynamic chunks */
 const WalletMetricsComp = dynamic(() =>
   import('../components/WalletMetrics').then(m => (m as any).default || m),
   { ssr: false, loading: () => <div className="card" style={{height:320}}/> }
 ) as React.ComponentType<WalletMetricsProps>;
 
-const CardPreviewMint = dynamic(
+// ✅ give dynamic a generic so TS knows this component's props
+const CardPreviewMint = dynamic<CardPreviewMintProps>(
   () => import('../components/CardPreviewMint').then(m => (m as any).default || m),
   { ssr: false, loading: () => <div className="card" style={{height:320}}/> }
 );
 
-/** Small helpers */
 function rnd(a: number, b: number) { return a + (b - a) * Math.random() }
 function rint(a: number, b: number) { return Math.floor(rnd(a, b)) }
 function isAddr(s?: string) { return !!s && /^0x[a-fA-F0-9]{40}$/.test(s.trim()) }
@@ -79,10 +91,7 @@ function speciesCueFor(species?: SpeciesId): string {
   }
 }
 
-/** Locked image prompt:
- *  - subject comes from traits.species (fox / dolphin / owl / panda)
- *  - camera / style / lighting / bg / composition / aspect are hard-locked
- */
+/** Locked image prompt (subject = species cue; rest hard-locked) */
 function buildLockedPrompt(traitsResp: any): string {
   const t = traitsResp?.traitsJson || traitsResp || {};
   const species: SpeciesId | undefined = t?.species;
@@ -94,14 +103,14 @@ function buildLockedPrompt(traitsResp: any): string {
     : 'deep electric blue gradient';
 
   const bits = [
-    speciesCue,                // the only semantic variable
-    'waist-up portrait',       // camera lock
-    'stylized 3D render',      // style lock
+    speciesCue,
+    'waist-up portrait',
+    'stylized 3D render',
     lock?.lighting || 'cinematic studio lighting',
-    'ultra detailed',          // quality lock
-    `background: ${bg}`,       // bg lock
-    'symmetrical composition', // composition lock
-    '1:1 aspect ratio',        // aspect lock
+    'ultra detailed',
+    `background: ${bg}`,
+    'symmetrical composition',
+    '1:1 aspect ratio',
   ];
   return bits.join(', ');
 }
@@ -122,7 +131,7 @@ function coerceCopy(x: any | null | undefined): PersonaCopy | null {
   return { title, oneLiner, summary, highlights, personalityTags };
 }
 
-/** Seeded demo narrative (so Persona panel is never empty) */
+/** Seeded demo narrative (never empty) */
 function seededRng(addr?: string) {
   let t = parseInt((addr?.slice(-8) || 'deadbeef'), 16) >>> 0;
   return () => {
@@ -335,7 +344,7 @@ export default function Page() {
 
   const anyStats = statsToShow as any;
   const rankStr = typeof anyStats?.globalRank === 'number' ? `#${anyStats.globalRank}` : '—';
-  const statsForCard = [
+  const statsForCard: CardStat[] = [
     { label: 'Rank',             value: rankStr },
     { label: 'Age',              value: `${statsToShow.walletAgeDays ?? 0} days` },
     { label: 'Active Days',      value: String(statsToShow.uniqueDays ?? 0) },
