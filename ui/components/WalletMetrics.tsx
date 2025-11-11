@@ -3,48 +3,33 @@
 import * as React from 'react'
 import styles from './frames.module.css'
 
-/* ---------- types: مطابق /api/metrics ---------- */
 type Rank = { rank: number; pct: number; score?: number }
 type Monthly = {
-  month: string
-  ym: number
-  avg_balance_eth?: number
-  volume_usd?: number
-  swap_volume_usd?: number
-  bridge_volume_usd?: number
-  native_txs?: number
-  token_txs?: number
-  uniq_contracts?: number
-  uniq_days?: number
-  uniq_weeks?: number
-  nft_unique_contracts?: number
-  gas_spent_eth?: number
-  tokens_traded_unique?: number
-  ranks?: { overall?: Rank } | null
+  month: string; ym: number;
+  avg_balance_eth?: number; volume_usd?: number;
+  swap_volume_usd?: number; bridge_volume_usd?: number;
+  native_txs?: number; token_txs?: number;
+  uniq_contracts?: number; uniq_days?: number; uniq_weeks?: number;
+  nft_unique_contracts?: number; gas_spent_eth?: number; tokens_traded_unique?: number;
+  ranks?: { overall?: Rank } | null;
 }
 type Summary = {
-  active_months_total?: number
-  wallet_age_days?: number
-  current_streak_months?: number
-  best_streak_months?: number
-  cum_ranks?: { overall?: { score: number; rank: number; pct: number } } | null
+  active_months_total?: number; wallet_age_days?: number;
+  current_streak_months?: number; best_streak_months?: number;
+  cum_ranks?: { overall?: { score: number; rank: number; pct: number } } | null;
 }
 type Payload = { summary: Summary; monthly: Monthly[] }
-
 type MonthOpt = { ym: number; label: string }
 
 type Props = {
   address?: string
   selectedYm: number | null
   onMonthsLoaded?: (list: MonthOpt[]) => void
-  onSelectionChange?: (ym: number) => void
 }
 
-/* ---------- helpers ---------- */
 const fmt = (n?: number, d = 2) => (n == null || Number.isNaN(n) ? '—' : Number(n).toFixed(d))
 const sum = (arr: number[]) => arr.reduce((a, b) => a + b, 0)
 const mean = (arr: number[]) => (arr.length ? sum(arr) / arr.length : 0)
-
 function delta(cur?: number, prev?: number) {
   if (cur == null || prev == null) return { diff: null as number | null, pct: null as number | null, sign: 0 as -1 | 0 | 1 }
   const diff = cur - prev
@@ -52,10 +37,9 @@ function delta(cur?: number, prev?: number) {
   return { diff, pct, sign: diff === 0 ? 0 : (diff > 0 ? 1 : -1) as -1 | 0 | 1 }
 }
 
-/* mini spark (بدون لیبل تاریخ – فقط title روی hover) */
-function Spark({
-  series, labels, selected, color,
-}: { series: number[]; labels: string[]; selected: number; color: string }) {
+function Spark({ series, labels, selected, color }:{
+  series: number[]; labels: string[]; selected: number; color: string
+}) {
   const w = 320, h = 96, pad = 10
   const n = series.length
   const xs = series.map((_, i) => pad + (n > 1 ? (i * (w - pad * 2)) / (n - 1) : 0))
@@ -63,20 +47,14 @@ function Spark({
   const y = (v: number) => h - pad - (v / max) * (h - pad * 2)
   const d = xs.map((x, i) => `${i ? 'L' : 'M'}${x.toFixed(1)},${y(series[i]).toFixed(1)}`).join(' ')
   const area = `${d} L${xs[n - 1]?.toFixed(1) || pad},${(h - pad).toFixed(1)} L${xs[0]?.toFixed(1) || pad},${(h - pad).toFixed(1)} Z`
-
   return (
     <div className={styles.sparkWrap}>
       <svg viewBox={`0 0 ${w} ${h}`} className={styles.spark} preserveAspectRatio="none">
-        <path d={area} style={{ fill: color.replace('rgb', 'rgba').replace(')', ',.16)') }} />
+        <path d={area} style={{ fill: color.replace('rgb','rgba').replace(')',',.16)') }} />
         <path d={d} style={{ stroke: color, strokeWidth: 2, fill: 'none' }} />
         {xs.map((x, i) => (
-          <circle
-            key={i}
-            cx={x}
-            cy={y(series[i])}
-            r={i === selected ? 4 : 2}
-            className={i === selected ? styles.dotSel : styles.dot}
-          >
+          <circle key={i} cx={x} cy={y(series[i])} r={i === selected ? 4 : 2}
+                  className={i === selected ? styles.dotSel : styles.dot}>
             <title>{`${labels[i]} • ${series[i]}`}</title>
           </circle>
         ))}
@@ -84,11 +62,9 @@ function Spark({
     </div>
   )
 }
-
 const Arrow = ({ s }: { s: -1 | 0 | 1 }) =>
   s > 0 ? <span className={styles.up}>▲</span> : s < 0 ? <span className={styles.down}>▼</span> : <span className={styles.flat}>■</span>
 
-/* ---------- demo payload (وقتی آدرس/فچ نامعتبر است) ---------- */
 function demoPayload(): Payload {
   const months: Monthly[] = []
   const base = new Date(); base.setMonth(base.getMonth() - 11)
@@ -111,119 +87,99 @@ function demoPayload(): Payload {
     })
     base.setMonth(base.getMonth() + 1)
   }
-  return {
-    summary: { active_months_total: months.length, wallet_age_days: 0, cum_ranks: { overall: { score: 0, rank: 0, pct: 0 } } },
-    monthly: months
-  }
+  return { summary: { active_months_total: months.length, wallet_age_days: 0, cum_ranks: { overall: { score: 0, rank: 0, pct: 0 } } }, monthly: months }
 }
 
-/* ===================================== */
-/*                COMPONENT              */
-/* ===================================== */
 const WalletMetrics: React.FC<Props> = ({ address, selectedYm, onMonthsLoaded }) => {
-  // 1) از همون اول دمو بذار تا هوک‌ها همیشه اجرا بشن و ریترن زودهنگام نداشته باشیم
-  const [data, setData] = React.useState<Payload>(demoPayload())
+  const [data, setData] = React.useState<Payload | null>(null)
   const [err, setErr] = React.useState<string | null>(null)
 
-  // 2) لود داده (آدرس معتبر ⇒ fetch، وگرنه دمو باقی می‌مونه)
+  // fetch (همیشه اجرا می‌شود؛ نه داخل شرطی که hook-count را تغییر دهد)
   React.useEffect(() => {
     let off = false
-    async function load() {
+    ;(async () => {
       setErr(null)
       try {
         if (!address || !/^0x[0-9a-fA-F]{40}$/.test(address)) {
-          if (!off) setData(demoPayload())
+          const d = demoPayload()
+          if (!off) { setData(d); onMonthsLoaded?.(d.monthly.map(m => ({ ym: m.ym, label: m.month }))) }
           return
         }
         const r = await fetch(`/api/metrics?address=${address.toLowerCase()}`)
         if (!r.ok) throw new Error(`HTTP ${r.status}`)
         const j = (await r.json()) as Payload
         j.monthly.sort((a, b) => a.month.localeCompare(b.month))
-        if (!off) setData(j)
+        if (!off) { setData(j); onMonthsLoaded?.(j.monthly.map(m => ({ ym: m.ym, label: m.month }))) }
       } catch (e: any) {
         if (!off) {
           setErr(e?.message || 'fetch failed')
-          setData(demoPayload())
+          const d = demoPayload()
+          setData(d)
+          onMonthsLoaded?.(d.monthly.map(m => ({ ym: m.ym, label: m.month })))
         }
       }
-    }
-    load()
+    })()
     return () => { off = true }
-  }, [address])
+  }, [address, onMonthsLoaded])
 
-  // 3) هر بار data عوض شد، لیست ماه‌ها را به والد بده
-  React.useEffect(() => {
-    onMonthsLoaded?.(data.monthly.map(m => ({ ym: m.ym, label: m.month })))
-  }, [data, onMonthsLoaded])
-
-  // 4) مشتقات پایدار (بدون ریترن زودهنگام)
-  const months = data.monthly
+  // از اینجا به بعد، حتی اگر data نداشته باشیم، با مقادیر پیش‌فرض محاسبه می‌کنیم تا شمار هوک‌ها ثابت بماند
+  const months = data?.monthly ?? []
   const labels = React.useMemo(() => months.map(m => m.month), [months])
 
   const selIndex = React.useMemo(() => {
-    const last = months.length - 1
-    if (last < 0) return -1
-    if (selectedYm == null) return last
+    if (months.length === 0) return 0
+    if (selectedYm == null) return months.length - 1
     const i = months.findIndex(m => m.ym === selectedYm)
-    return i >= 0 ? i : last
+    return i >= 0 ? i : months.length - 1
   }, [months, selectedYm])
 
   const modeAllTime = selectedYm == null
-  const cur  = selIndex >= 0 ? months[selIndex] : undefined
-  const prev = selIndex > 0  ? months[selIndex - 1] : undefined
+  const cur = months[selIndex] ?? {}
+  const prev = months[selIndex - 1] ?? {}
 
-  // series
-  const sBal   = months.map(m => Number(m.avg_balance_eth || 0))
-  const sTrades= months.map(m => Number(m.token_txs || 0))
-  const sTxs   = months.map(m => Number(m.native_txs || 0))
-  const sUniq  = months.map(m => Number(m.uniq_contracts || 0))
-  const sDays  = months.map(m => Number(m.uniq_days || 0))
-  const sStreak= months.map(m => Number(m.uniq_weeks || 0))
-  const sGas   = months.map(m => Number(m.gas_spent_eth || 0))
-  const sNft   = months.map(m => Number(m.nft_unique_contracts || 0))
-  const sRank  = months.map(m => Number(m.ranks?.overall?.rank ?? 0))
+  const sBal   = React.useMemo(() => months.map(m => Number(m.avg_balance_eth || 0)), [months])
+  const sTrades= React.useMemo(() => months.map(m => Number(m.token_txs || 0)), [months])
+  const sTxs   = React.useMemo(() => months.map(m => Number(m.native_txs || 0)), [months])
+  const sUniq  = React.useMemo(() => months.map(m => Number(m.uniq_contracts || 0)), [months])
+  const sDays  = React.useMemo(() => months.map(m => Number(m.uniq_days || 0)), [months])
+  const sStreak= React.useMemo(() => months.map(m => Number(m.uniq_weeks || 0)), [months])
+  const sGas   = React.useMemo(() => months.map(m => Number(m.gas_spent_eth || 0)), [months])
+  const sNft   = React.useMemo(() => months.map(m => Number(m.nft_unique_contracts || 0)), [months])
+  const sRank  = React.useMemo(() => months.map(m => Number(m.ranks?.overall?.rank ?? 0)), [months])
 
-  // values (all-time vs monthly)
   const V = {
-    balance: modeAllTime ? mean(sBal) : (cur?.avg_balance_eth ?? 0),
-    trades:  modeAllTime ? sum(sTrades) : (cur?.token_txs ?? 0),
-    txs:     modeAllTime ? sum(sTxs)    : (cur?.native_txs ?? 0),
-    uniq:    modeAllTime ? sum(sUniq)   : (cur?.uniq_contracts ?? 0),
-    days:    modeAllTime ? sum(sDays)   : (cur?.uniq_days ?? 0),
-    streak:  modeAllTime ? Math.max(...sStreak, 0) : (cur?.uniq_weeks ?? 0),
-    gas:     modeAllTime ? sum(sGas)    : (cur?.gas_spent_eth ?? 0),
-    nft:     modeAllTime ? sum(sNft)    : (cur?.nft_unique_contracts ?? 0),
-    rank:    modeAllTime ? (Math.min(...sRank.filter(x => x > 0)) || 0) : (cur?.ranks?.overall?.rank ?? 0),
+    balance: modeAllTime ? mean(sBal) : (cur as any).avg_balance_eth ?? 0,
+    trades:  modeAllTime ? sum(sTrades) : (cur as any).token_txs ?? 0,
+    txs:     modeAllTime ? sum(sTxs)    : (cur as any).native_txs ?? 0,
+    uniq:    modeAllTime ? sum(sUniq)   : (cur as any).uniq_contracts ?? 0,
+    days:    modeAllTime ? sum(sDays)   : (cur as any).uniq_days ?? 0,
+    streak:  modeAllTime ? Math.max(...sStreak, 0) : (cur as any).uniq_weeks ?? 0,
+    gas:     modeAllTime ? sum(sGas)    : (cur as any).gas_spent_eth ?? 0,
+    nft:     modeAllTime ? sum(sNft)    : (cur as any).nft_unique_contracts ?? 0,
+    rank:    modeAllTime ? (Math.min(...sRank.filter(x => x > 0)) || 0) : (cur as any).ranks?.overall?.rank ?? 0,
   }
 
-  // deltas (All time → «—»)
-  const dBalance = modeAllTime ? null : delta(cur?.avg_balance_eth, prev?.avg_balance_eth)
-  const dTrades  = modeAllTime ? null : delta(cur?.token_txs,     prev?.token_txs)
-  const dTxs     = modeAllTime ? null : delta(cur?.native_txs,    prev?.native_txs)
-  const dUniq    = modeAllTime ? null : delta(cur?.uniq_contracts,prev?.uniq_contracts)
-  const dDays    = modeAllTime ? null : delta(cur?.uniq_days,     prev?.uniq_days)
-  const dStreak  = modeAllTime ? null : delta(cur?.uniq_weeks,    prev?.uniq_weeks)
-  const dGas     = modeAllTime ? null : delta(cur?.gas_spent_eth, prev?.gas_spent_eth)
-  const dNft     = modeAllTime ? null : delta(cur?.nft_unique_contracts, prev?.nft_unique_contracts)
+  const dBalance = modeAllTime ? null : delta((cur as any).avg_balance_eth, (prev as any)?.avg_balance_eth)
+  const dTrades  = modeAllTime ? null : delta((cur as any).token_txs,      (prev as any)?.token_txs)
+  const dTxs     = modeAllTime ? null : delta((cur as any).native_txs,     (prev as any)?.native_txs)
+  const dUniq    = modeAllTime ? null : delta((cur as any).uniq_contracts, (prev as any)?.uniq_contracts)
+  const dDays    = modeAllTime ? null : delta((cur as any).uniq_days,      (prev as any)?.uniq_days)
+  const dStreak  = modeAllTime ? null : delta((cur as any).uniq_weeks,     (prev as any)?.uniq_weeks)
+  const dGas     = modeAllTime ? null : delta((cur as any).gas_spent_eth,  (prev as any)?.gas_spent_eth)
+  const dNft     = modeAllTime ? null : delta((cur as any).nft_unique_contracts, (prev as any)?.nft_unique_contracts)
   const dRank    = modeAllTime ? null : (() => {
-    const a = cur?.ranks?.overall?.rank, b = prev?.ranks?.overall?.rank
+    const a = (cur as any).ranks?.overall?.rank, b = (prev as any)?.ranks?.overall?.rank
     if (a == null || b == null) return null
-    const diff = b - a // بهبود اگر مثبت باشد
+    const diff = b - a
     return { diff, pct: null, sign: diff === 0 ? 0 : (diff > 0 ? 1 : -1) as -1 | 0 | 1 }
   })()
 
   const Card = ({
     title, value, unit, deltaObj, series, labels, color, subtitle, footNote,
   }: {
-    title: string
-    value: string
-    unit?: string
-    deltaObj?: { diff: number | null; pct: number | null; sign: -1 | 0 | 1 } | null
-    series: number[]
-    labels: string[]
-    color: string
-    subtitle?: string
-    footNote?: string
+    title: string; value: string; unit?: string;
+    deltaObj?: { diff: number | null; pct: number | null; sign: -1 | 0 | 1 } | null;
+    series: number[]; labels: string[]; color: string; subtitle?: string; footNote?: string;
   }) => (
     <div className={styles.card}>
       <div className={styles.head}>
@@ -241,42 +197,35 @@ const WalletMetrics: React.FC<Props> = ({ address, selectedYm, onMonthsLoaded })
             : '—'}
         </div>
       </div>
-      <Spark series={series} labels={labels} selected={Math.max(selIndex, 0)} color={color} />
+      <Spark series={series} labels={labels} selected={Math.max(0, Math.min(series.length - 1, selIndex))} color={color} />
     </div>
   )
 
-  // اگر به هر دلیل هیچ ماهی نبود، اسکلت ساده نشان بده (بدون تغییر ترتیب هوک‌ها)
-  if (months.length === 0) {
+  // UI: اگر هنوز داده نداریم، با اسکلتون ساده نشون بده ولی هوک‌ها ثابت موندند
+  if (!data) {
     return (
       <div className={styles.grid}>
-        <div className={styles.card}><div className={styles.skel} /></div>
-        <div className={styles.card}><div className={styles.skel} /></div>
-        <div className={styles.card}><div className={styles.skel} /></div>
+        <div className={styles.card}><div className={styles.title}>Loading…</div></div>
       </div>
     )
   }
 
   return (
     <div className={styles.grid}>
-      {/* Row 1 */}
       <Card title="Balance (ETH)" value={fmt(V.balance, 3)} deltaObj={dBalance ?? undefined}
             series={sBal} labels={labels} color="rgb(59,130,246)" subtitle="on-chain (avg)" />
       <Card title="Trades (count)" value={fmt(V.trades, 0)} deltaObj={dTrades ?? undefined}
             series={sTrades} labels={labels} color="rgb(16,185,129)" subtitle="swap/trade tx count" />
       <Card title="Transactions" value={fmt(V.txs, 0)} deltaObj={dTxs ?? undefined}
             series={sTxs} labels={labels} color="rgb(37,99,235)" subtitle="txs per month" />
-
-      {/* Row 2 */}
       <Card title="Unique Contracts" value={fmt(V.uniq, 0)} deltaObj={dUniq ?? undefined}
             series={sUniq} labels={labels} color="rgb(234,179,8)" subtitle="per month" />
       <Card title="Active Days" value={fmt(V.days, 0)} deltaObj={dDays ?? undefined}
             series={sDays} labels={labels} color="rgb(147,51,234)" subtitle="per month" />
       <Card title="Best Streak (days)" value={fmt(V.streak, 0)} deltaObj={dStreak ?? undefined}
             series={sStreak} labels={labels} color="rgb(245,158,11)" subtitle="within month" />
-
-      {/* Row 3 */}
       <Card title="Gas Paid (ETH)" value={fmt(V.gas, 4)} deltaObj={dGas ?? undefined}
-            series={sGas} labels={labels} color="rgb(244,63,94)" subtitle={modeAllTime ? 'all-time' : 'this month'} />
+            series={sGas} labels={labels} color="rgb(244,63,94)" subtitle={modeAllTime ? "all-time" : "this month"} />
       <Card title="NFT (count)" value={fmt(V.nft, 0)} deltaObj={dNft ?? undefined}
             series={sNft} labels={labels} color="rgb(99,102,241)" subtitle="unique NFT contracts" />
       <Card title="Monthly Rank" value={V.rank ? `#${fmt(V.rank, 0)}` : '—'} deltaObj={dRank ?? undefined}
