@@ -8,7 +8,7 @@ import { PersonaText } from '../components/PersonaText';
 import { useAccount } from 'wagmi';
 import type { WalletStatRecord } from '../components/WalletStats';
 import styles from '../components/frames.module.css';
-import { SPECIES, SpeciesId } from '../lib/species';
+import type { SpeciesId } from '../lib/species';
 
 declare global { interface Window { ethereum?: any } }
 
@@ -68,6 +68,17 @@ function buildRandomMetrics(addr: string): WalletStatRecord {
   }
 }
 
+/** Local cue for species → avoids importing a missing SPECIES map */
+function speciesCueFor(species?: SpeciesId): string {
+  switch (species) {
+    case 'fox':     return 'sleek Base-blue cyber-fox avatar';
+    case 'dolphin': return 'neon-blue cyber dolphin mascot';
+    case 'owl':     return 'cerulean techno-owl avatar with calm gaze';
+    case 'panda':   return 'blue-toned cyber panda avatar';
+    default:        return 'futuristic Base-native avatar';
+  }
+}
+
 /** Locked image prompt:
  *  - subject comes from traits.species (fox / dolphin / owl / panda)
  *  - camera / style / lighting / bg / composition / aspect are hard-locked
@@ -75,7 +86,7 @@ function buildRandomMetrics(addr: string): WalletStatRecord {
 function buildLockedPrompt(traitsResp: any): string {
   const t = traitsResp?.traitsJson || traitsResp || {};
   const species: SpeciesId | undefined = t?.species;
-  const speciesCue = species ? SPECIES[species]?.imageCue : 'futuristic Base-native avatar';
+  const speciesCue = speciesCueFor(species);
 
   const lock = t?.styleLock || {};
   const bg = lock?.bg === 'brand_orb_v1'
