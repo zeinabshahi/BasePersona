@@ -8,7 +8,7 @@ import { PersonaText } from '../components/PersonaText';
 import { useAccount } from 'wagmi';
 import type { WalletStatRecord } from '../components/WalletStats';
 import styles from '../components/frames.module.css';
-import type { SpeciesId } from '../lib/species';
+import { SpeciesId } from '../lib/species';
 
 declare global { interface Window { ethereum?: any } }
 
@@ -32,30 +32,18 @@ type WalletMetricsProps = {
   onSelectionChange?: (ym: number) => void
 }
 
-/** CardPreviewMint props (to satisfy TS for dynamic import) */
-type CardStat = { label: string; value: string }
-type CardPreviewMintProps = {
-  defaultPrompt: string
-  title?: string
-  subtitle?: string
-  stats: CardStat[]
-  badgeText?: string
-  logoHref?: string
-  onMintClick?: () => void
-}
-
 /** Dynamic chunks */
 const WalletMetricsComp = dynamic(() =>
   import('../components/WalletMetrics').then(m => (m as any).default || m),
   { ssr: false, loading: () => <div className="card" style={{height:320}}/> }
 ) as React.ComponentType<WalletMetricsProps>;
 
-// ✅ give dynamic a generic so TS knows this component's props
-const CardPreviewMint = dynamic<CardPreviewMintProps>(
+const CardPreviewMint = dynamic(
   () => import('../components/CardPreviewMint').then(m => (m as any).default || m),
   { ssr: false, loading: () => <div className="card" style={{height:320}}/> }
-);
+) as React.ComponentType<any>;
 
+/** Small helpers */
 function rnd(a: number, b: number) { return a + (b - a) * Math.random() }
 function rint(a: number, b: number) { return Math.floor(rnd(a, b)) }
 function isAddr(s?: string) { return !!s && /^0x[a-fA-F0-9]{40}$/.test(s.trim()) }
@@ -80,37 +68,37 @@ function buildRandomMetrics(addr: string): WalletStatRecord {
   }
 }
 
-/** Local cue for species → avoids importing a missing SPECIES map */
-function speciesCueFor(species?: SpeciesId): string {
-  switch (species) {
-    case 'fox':     return 'sleek Base-blue cyber-fox avatar';
-    case 'dolphin': return 'neon-blue cyber dolphin mascot';
-    case 'owl':     return 'cerulean techno-owl avatar with calm gaze';
-    case 'panda':   return 'blue-toned cyber panda avatar';
-    default:        return 'futuristic Base-native avatar';
+/** species → short visual cue (no need for SPECIES map) */
+function speciesCueFor(s?: SpeciesId) {
+  switch (s) {
+    case 'fox': return 'Base-blue cyber fox character';
+    case 'dolphin': return 'Base-blue cyber dolphin character';
+    case 'owl': return 'Base-blue cyber owl character';
+    case 'panda': return 'Base-blue cyber panda character';
+    default: return 'futuristic Base-native avatar';
   }
 }
 
-/** Locked image prompt (subject = species cue; rest hard-locked) */
+/** Locked image prompt built from traits locks */
 function buildLockedPrompt(traitsResp: any): string {
   const t = traitsResp?.traitsJson || traitsResp || {};
   const species: SpeciesId | undefined = t?.species;
   const speciesCue = speciesCueFor(species);
 
   const lock = t?.styleLock || {};
-  const bg = lock?.bg === 'brand_orb_v1'
+  const bg = lock?.bgLock === 'brand_orb_v1'
     ? 'Base-blue orbital gradient with soft particles'
     : 'deep electric blue gradient';
 
   const bits = [
-    speciesCue,
-    'waist-up portrait',
-    'stylized 3D render',
+    speciesCue,                // the only semantic variable
+    'waist-up portrait',       // camera lock
+    'stylized 3D render',      // style lock
     lock?.lighting || 'cinematic studio lighting',
-    'ultra detailed',
-    `background: ${bg}`,
-    'symmetrical composition',
-    '1:1 aspect ratio',
+    'ultra detailed',          // quality lock
+    `background: ${bg}`,       // bg lock
+    'symmetrical composition', // composition lock
+    '1:1 aspect ratio',        // aspect lock
   ];
   return bits.join(', ');
 }
@@ -131,7 +119,7 @@ function coerceCopy(x: any | null | undefined): PersonaCopy | null {
   return { title, oneLiner, summary, highlights, personalityTags };
 }
 
-/** Seeded demo narrative (never empty) */
+/** Seeded demo narrative (so Persona panel is never empty) */
 function seededRng(addr?: string) {
   let t = parseInt((addr?.slice(-8) || 'deadbeef'), 16) >>> 0;
   return () => {
@@ -344,7 +332,7 @@ export default function Page() {
 
   const anyStats = statsToShow as any;
   const rankStr = typeof anyStats?.globalRank === 'number' ? `#${anyStats.globalRank}` : '—';
-  const statsForCard: CardStat[] = [
+  const statsForCard = [
     { label: 'Rank',             value: rankStr },
     { label: 'Age',              value: `${statsToShow.walletAgeDays ?? 0} days` },
     { label: 'Active Days',      value: String(statsToShow.uniqueDays ?? 0) },
