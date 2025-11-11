@@ -1,9 +1,9 @@
-// ui/lib/prompt.ts
+// lib/prompt.ts
 /**
- * Deterministic image prompt builder for Base Persona.
- * - Visual style is fully LOCKED (camera / lighting / background / composition / aspect).
- * - Only the SUBJECT varies via `traits.species` (fox | dolphin | owl | panda).
- * - No HTML, no bold tags in the prompt.
+ * Deterministic, locked prompt builder for Base Persona images.
+ * - Visual style is LOCKED (camera / lighting / background / composition / aspect).
+ * - Only the SUBJECT varies via `species` (fox | dolphin | owl | panda).
+ * - No HTML/tags in the prompt.
  */
 
 export type SpeciesId = 'fox' | 'dolphin' | 'owl' | 'panda';
@@ -17,20 +17,17 @@ export type StyleLock = {
 };
 
 export type BuildPromptInput = {
-  // typical fields we may receive from pickTraits / traitsJson
-  species?: SpeciesId | string;
-  styleLock?: StyleLock;
-  // optional future hooks
-  baseImageRef?: string;  // id/url of the base template (if your renderer supports reference images)
-  paletteId?: number;
-  [key: string]: any;
+  species?: SpeciesId | string;  // preferred: 'fox' | 'dolphin' | 'owl' | 'panda'
+  styleLock?: StyleLock;         // locks for camera/lighting/bg/composition/aspect
+  paletteId?: number;            // ignored here but kept for compat
+  [key: string]: any;            // tolerate extra fields (traits/persona, etc.)
 };
 
 const SPECIES_CUES: Record<SpeciesId, string> = {
-  fox:     "waist-up portrait of a stylized fox character (smart, agile, playful but focused)",
-  dolphin: "waist-up portrait of a stylized dolphin character (curious, precise, calm under pressure)",
-  owl:     "waist-up portrait of a stylized owl character (observant, thoughtful, unflappable)",
-  panda:   "waist-up portrait of a stylized panda character (steady, friendly, quietly determined)",
+  fox:     'waist-up portrait of a stylized fox character (smart, agile, playful but focused)',
+  dolphin: 'waist-up portrait of a stylized dolphin character (curious, precise, calm under pressure)',
+  owl:     'waist-up portrait of a stylized owl character (observant, thoughtful, unflappable)',
+  panda:   'waist-up portrait of a stylized panda character (steady, friendly, quietly determined)',
 };
 
 function normalizeSpecies(x?: string): SpeciesId {
@@ -47,7 +44,7 @@ function normalizeStyleLock(lock?: StyleLock) {
   const composition = lock?.composition || 'symmetrical composition';
   const aspect      = lock?.aspect      || '1:1 aspect ratio';
 
-  // brand_orb_v1 = our Base-blue orbital gradient w/ soft particles
+  // brand_orb_v1 → Base-blue orbital gradient with soft particles
   const bg = (() => {
     const k = (lock?.bg || '').toLowerCase();
     if (k === 'brand_orb_v1') return 'Base-blue orbital gradient background with soft particles';
@@ -59,22 +56,17 @@ function normalizeStyleLock(lock?: StyleLock) {
 }
 
 function clean(s: string): string {
-  // avoid any HTML artifacts
+  // remove any HTML artifacts and collapse whitespace
   return s.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
-/**
- * Build a single locked prompt string.
- * If you want to pass reference images to your renderer, do it in your image layer;
- * here we only write plain-text guidance (no IDs are assumed).
- */
-export function buildPrompt(traits: BuildPromptInput): string {
+/** Core builder (locked). */
+function _buildLockedPrompt(traits: BuildPromptInput): string {
   const species = normalizeSpecies(
-    // try several known locations where species might live
-    (traits as any)?.species
-      || (traits as any)?.names?.species
-      || (traits as any)?.persona?.species
-  ) as SpeciesId;
+    traits?.species ||
+    (traits as any)?.names?.species ||
+    (traits as any)?.persona?.species
+  );
 
   const cue = SPECIES_CUES[species];
   const { camera, lighting, composition, aspect, bg } = normalizeStyleLock(traits?.styleLock);
@@ -88,12 +80,16 @@ export function buildPrompt(traits: BuildPromptInput): string {
     bg,                               // BACKGROUND LOCK
     composition,                      // COMPOSITION LOCK
     aspect,                           // ASPECT LOCK
-    // brand tone (kept subtle; avoids leaking specific visual props)
     'subtle Base-native energy, crisp edges, no text, no UI, no logos',
   ];
 
   return clean(parts.join(', '));
 }
 
-// optional default export to be extra-safe with imports
-export default buildPrompt;
+/* ---- Exports (backward compatible) ---- */
+// Some modules import named `buildLockedPrompt`, others import named `buildPrompt`,
+// and some use default import. Support all three.
+
+export const buildLockedPrompt = _buildLockedPrompt;
+export const buildPrompt = _buildLockedPrompt;       // alias for older callers
+export default _buildLockedPrompt;
