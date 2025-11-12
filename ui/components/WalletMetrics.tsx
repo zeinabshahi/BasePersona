@@ -26,7 +26,6 @@ type Props = {
   address?: string
   selectedYm: number | null
   onMonthsLoaded?: (list: MonthOpt[]) => void
-  /** وقتی روی نقطه‌ای کلیک می‌شود، والد می‌تواند selectedYm را به آن ماه ببرد */
   onSelectionChange?: (ym: number) => void
 }
 
@@ -40,21 +39,21 @@ function delta(cur?: number, prev?: number) {
   return { diff, pct, sign: diff === 0 ? 0 : (diff > 0 ? 1 : -1) as -1 | 0 | 1 }
 }
 
-/** Dropdown label: “YYYY-MM • Mon YYYY” */
+/** Dropdown: “YYYY-MM • Mon YYYY” */
 function longMonthLabel(m: string) {
   const [y, mm] = m.split('-').map(x => parseInt(x, 10));
   const dt = new Date(y, (mm || 1) - 1, 1);
   const long = dt.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
   return `${m} • ${long}`;
 }
-/** Chart label: “Mon YYYY” (text only) */
+/** Chart label: “Mon YYYY” */
 function shortMonthLabel(m: string) {
   const [y, mm] = m.split('-').map(x => parseInt(x, 10));
   const dt = new Date(y, (mm || 1) - 1, 1);
   return dt.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
 }
 
-/** Spark chart with two-line tooltip + CLICKABLE points */
+/** Spark with two-line tooltip + CLICKABLE points */
 function Spark({
   series, labels, selected, color, tooltipLabel, onPick,
 }:{
@@ -88,7 +87,6 @@ function Spark({
             };
             return (
               <g key={i}>
-                {/* invisible hit zone for easy clicks */}
                 <circle
                   cx={x}
                   cy={cy}
@@ -120,7 +118,7 @@ function Spark({
           })}
         </svg>
       </div>
-      {/* start/end dates under chart */}
+      {/* start/end dates */}
       <div style={{display:'flex', justifyContent:'space-between', fontSize:12, opacity:.7, marginTop:4}}>
         <span>{labels[0] || ''}</span>
         <span>{labels[labels.length-1] || ''}</span>
@@ -132,7 +130,6 @@ function Spark({
 const Arrow = ({ s }: { s: -1 | 0 | 1 }) =>
   s > 0 ? <span className={styles.up}>▲</span> : s < 0 ? <span className={styles.down}>▼</span> : <span className={styles.flat}>■</span>
 
-/** SWR fetcher with AbortController */
 const fetcher = (url: string) => {
   const ctrl = new AbortController();
   const p = fetch(url, { signal: ctrl.signal, cache: 'no-store' }).then(r => {
@@ -144,7 +141,6 @@ const fetcher = (url: string) => {
   return p as Promise<Payload>;
 };
 
-/** Demo payload (stable shape) */
 function demoPayload(): Payload {
   const months: Monthly[] = [];
   const base = new Date(); base.setMonth(base.getMonth() - 11);
@@ -192,7 +188,7 @@ const WalletMetrics: React.FC<Props> = ({ address, selectedYm, onMonthsLoaded, o
     return data ?? demoPayload();
   }, [key, data, error]);
 
-  // send month list to parent (dropdown uses long label)
+  // populate dropdown
   const onMonthsLoadedRef = React.useRef(onMonthsLoaded);
   React.useEffect(() => { onMonthsLoadedRef.current = onMonthsLoaded }, [onMonthsLoaded]);
   React.useEffect(() => {
@@ -257,6 +253,18 @@ const WalletMetrics: React.FC<Props> = ({ address, selectedYm, onMonthsLoaded, o
     if (ym && onSelectionChange) onSelectionChange(ym);
   }, [months, onSelectionChange]);
 
+  // 🔹 زیرنویس‌های پویا بر اساس حالت نمایش
+  const sub = {
+    balance: modeAllTime ? 'all-time avg' : 'on-chain (avg)',
+    trades:  modeAllTime ? 'all-time'     : 'this month',
+    txs:     modeAllTime ? 'all-time'     : 'this month',
+    uniq:    modeAllTime ? 'all-time'     : 'per month',
+    days:    modeAllTime ? 'all-time'     : 'per month',
+    streak:  modeAllTime ? 'all-time best': 'within month',
+    gas:     modeAllTime ? 'all-time'     : 'this month',
+    nft:     modeAllTime ? 'all-time'     : 'this month',
+  };
+
   const Card = ({
     title, value, unit, deltaObj, series, labels, color, subtitle, footNote, tooltipLabel,
   }: {
@@ -294,14 +302,11 @@ const WalletMetrics: React.FC<Props> = ({ address, selectedYm, onMonthsLoaded, o
 
   return (
     <div className={styles.grid}>
-      {/* در حالت دمو یک نوت کوچک نشان می‌دهیم */}
       {isDemo && (
         <div className={styles.muted} style={{gridColumn:'1 / -1', marginBottom: 4}}>
           Showing demo data (connect a wallet or enter an address to see real metrics)
         </div>
       )}
-
-      {/* اگر واقعا در حال لودِ آدرس معتبر هستیم، یک خط لودینگ کوچک */}
       {isLoadingReal && (
         <div className={styles.muted} style={{gridColumn:'1 / -1', marginBottom: 4}}>
           Loading metrics…
@@ -309,21 +314,21 @@ const WalletMetrics: React.FC<Props> = ({ address, selectedYm, onMonthsLoaded, o
       )}
 
       <Card title="Balance (ETH)" value={fmt(V.balance, 3)} deltaObj={dBalance ?? undefined}
-            series={sBal} labels={labels} color="rgb(59,130,246)" subtitle="on-chain (avg)" tooltipLabel="ETH balance" />
+            series={sBal} labels={labels} color="rgb(59,130,246)" subtitle={sub.balance} tooltipLabel="ETH balance" />
       <Card title="Trades (count)" value={fmt(V.trades, 0)} deltaObj={dTrades ?? undefined}
-            series={sTrades} labels={labels} color="rgb(16,185,129)" subtitle="swap/trade tx count" tooltipLabel="trades" />
+            series={sTrades} labels={labels} color="rgb(16,185,129)" subtitle={sub.trades} tooltipLabel="trades" />
       <Card title="Transactions" value={fmt(V.txs, 0)} deltaObj={dTxs ?? undefined}
-            series={sTxs} labels={labels} color="rgb(37,99,235)" subtitle="txs per month" tooltipLabel="transactions" />
+            series={sTxs} labels={labels} color="rgb(37,99,235)" subtitle={sub.txs} tooltipLabel="transactions" />
       <Card title="Unique Contracts" value={fmt(V.uniq, 0)} deltaObj={dUniq ?? undefined}
-            series={sUniq} labels={labels} color="rgb(234,179,8)" subtitle="per month" tooltipLabel="unique contracts" />
+            series={sUniq} labels={labels} color="rgb(234,179,8)" subtitle={sub.uniq} tooltipLabel="unique contracts" />
       <Card title="Active Days" value={fmt(V.days, 0)} deltaObj={dDays ?? undefined}
-            series={sDays} labels={labels} color="rgb(147,51,234)" subtitle="per month" tooltipLabel="active days" />
+            series={sDays} labels={labels} color="rgb(147,51,234)" subtitle={sub.days} tooltipLabel="active days" />
       <Card title="Best Streak (days)" value={fmt(V.streak, 0)} deltaObj={dStreak ?? undefined}
-            series={sStreak} labels={labels} color="rgb(245,158,11)" subtitle="within month" tooltipLabel="best streak (days)" />
+            series={sStreak} labels={labels} color="rgb(245,158,11)" subtitle={sub.streak} tooltipLabel="best streak (days)" />
       <Card title="Gas Paid (ETH)" value={fmt(V.gas, 4)} deltaObj={dGas ?? undefined}
-            series={sGas} labels={labels} color="rgb(244,63,94)" subtitle={selectedYm==null ? "all-time" : "this month"} tooltipLabel="ETH gas" />
+            series={sGas} labels={labels} color="rgb(244,63,94)" subtitle={sub.gas} tooltipLabel="ETH gas" />
       <Card title="NFT (count)" value={fmt(V.nft, 0)} deltaObj={dNft ?? undefined}
-            series={sNft} labels={labels} color="rgb(99,102,241)" subtitle="unique NFT contracts" tooltipLabel="NFT contracts" />
+            series={sNft} labels={labels} color="rgb(99,102,241)" subtitle={sub.nft} tooltipLabel="NFT contracts" />
       <Card title="Monthly Rank" value={V.rank ? `#${fmt(V.rank, 0)}` : '—'} deltaObj={dRank ?? undefined}
             series={sRank} labels={labels} color="rgb(107,114,128)" subtitle="better is lower" tooltipLabel="rank (lower is better)" />
 
