@@ -65,7 +65,7 @@ function Spark({
   const n = series.length;
   const xs = series.map((_, i) => pad + (n > 1 ? (i * (w - pad * 2)) / (n - 1) : 0));
   const max = Math.max(0.0001, ...series);
-  const y = (v: number) => h - pad - (v / max) * (h - pad * 2));
+  const y = (v: number) => h - pad - (v / max) * (h - pad * 2);
   const d = xs.map((x, i) => `${i ? 'L' : 'M'}${x.toFixed(1)},${y(series[i]).toFixed(1)}`).join(' ');
   const area = `${d} L${xs[n - 1]?.toFixed(1) || pad},${(h - pad).toFixed(1)} L${xs[0]?.toFixed(1) || pad},${(h - pad).toFixed(1)} Z`;
 
