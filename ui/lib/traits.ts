@@ -1,115 +1,238 @@
-// Trait selection logic based on wallet metrics and configuration.
+// lib/traits.ts
+import type { SpeciesId } from './species';
+import { SPECIES } from './species';
 
-import cfg from '../config/anime-cyberpunk.json';
-import { WalletInput, LayerResult, TraitPick, LayerNames } from './types';
-import { geneGender, backgroundName } from './rules';
+export type Metrics = {
+  uniqueContracts?: number;
+  activeDays?: number;
+  gasEth?: number;
+  monthlyRank?: number; // lower is better
+  nftCount?: number;
+  balanceEth?: number;
+  totalTxs?: number;
+};
 
-/**
- * Look up a trait within a layer by name. Returns undefined if the layer
- * or trait cannot be found in the configuration. This function assumes
- * a flat structure of layers with buckets containing a `trait` property.
- */
-function findTrait(layerName: string, traitName: string): TraitPick | undefined {
-  const layer = (cfg as any).layers.find((l: any) => l.name === layerName);
-  if (!layer) return undefined;
-  const bucket = (layer.buckets as any[]).find((b: any) => b.trait?.name === traitName);
-  return bucket?.trait;
+export const THRESHOLDS = {
+  uniqueContracts: [20, 50, 100, 200, 500, 1000],
+  activeDays: [10, 20, 50, 100, 200, 500],
+  gasEth: [0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1],
+  monthlyRank: [1000, 5000, 25000, 50000, 100000, 250000, 500000], // lower → better
+  nftCount: [1, 10, 50, 100, 200, 500],
+  balanceEth: [0.001, 0.002, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1],
+  totalTxs: [100, 200, 500, 1000, 2000, 3000],
+};
+
+function bucketBySteps(value: number, steps: number[]) {
+  // returns 0..steps.length, where k means value >= steps[k-1] and < steps[k] (except last)
+  let idx = 0;
+  for (const s of steps) {
+    if (value >= s) idx++;
+    else break;
+  }
+  return idx;
+}
+function bucketByStepsLowerIsBetter(value: number, steps: number[]) {
+  // lower is better: idx increments while value <= step
+  let idx = 0;
+  for (const s of steps) {
+    if (value <= s) idx++;
+    else break;
+  }
+  return idx;
 }
 
-/**
- * Select a trait based on a numeric value and defined ranges. Buckets in the
- * config specify `min` and `max` values; the first bucket matching the
- * provided value (inclusive) is returned. If no bucket matches, fall back
- * to the last bucket in the layer.
- */
-function pickByRanges(layerName: string, value: number): string {
-  const layer = (cfg as any).layers.find((l: any) => l.name === layerName);
-  if (!layer) return '';
-  for (const b of layer.buckets as any[]) {
-    const min = b.min ?? Number.MIN_SAFE_INTEGER;
-    const max = b.max ?? Number.MAX_SAFE_INTEGER;
-    if (value >= min && value <= max) return b.trait.name;
-  }
-  const last = layer.buckets[layer.buckets.length - 1];
-  return last?.trait?.name ?? '';
-}
+export type BuiltTraits = {
+  version: 2;
+  species: SpeciesId;
+  styleLock: {
+    camera: 'waist_up';
+    lineStyle: 'bold_clean';
+    background: 'solid';
+    bgHex: string;
+  };
+  // tier indices (0..N) for debugging / UI
+  tiers: {
+    uniqueContracts: number;
+    activeDays: number;
+    gasEth: number;
+    monthlyRank: number;
+    nftCount: number;
+    balanceEth: number;
+    totalTxs: number;
+  };
+  // friendly names (optional UI)
+  names: {
+    headwear: string;
+    eyes: string;
+    clothing: string;
+    accessory: string;
+    emblem: string;
+  };
+  // prompt parts to be injected into the final prompt
+  promptParts: {
+    headwear: string;
+    eyes: string;
+    clothing: string;
+    accessory: string;
+    emblem: string;
+  };
+};
 
-/**
- * Count how many layers have top-tier traits. A top-tier trait is the last
- * bucket defined in the configuration for that layer. This is used to
- * determine whether an optional Signature layer should be included.
- */
-function countTopTiers(layerNames: Record<string, string>): number {
-  let count = 0;
-  for (const layer of Object.keys(layerNames)) {
-    const configLayer = (cfg as any).layers.find((l: any) => l.name === layer);
-    if (!configLayer || !Array.isArray(configLayer.buckets)) continue;
-    const last = configLayer.buckets[configLayer.buckets.length - 1];
-    if (last?.trait?.name === layerNames[layer]) count++;
-  }
-  return count;
-}
+export function pickTraits(
+  mIn: Metrics,
+  species: SpeciesId
+): BuiltTraits {
+  const m = {
+    uniqueContracts: Number(mIn.uniqueContracts ?? 0),
+    activeDays: Number(mIn.activeDays ?? 0),
+    gasEth: Number(mIn.gasEth ?? 0),
+    monthlyRank: Number(mIn.monthlyRank ?? 99999999),
+    nftCount: Number(mIn.nftCount ?? 0),
+    balanceEth: Number(mIn.balanceEth ?? 0),
+    totalTxs: Number(mIn.totalTxs ?? 0),
+  };
 
-/**
- * Convert a wallet input into selected trait picks and names. The selection
- * uses heuristics: gender gene from birth month, ranges for metrics, and
- * bitwise logic for NFTs. A signature trait may be added based on the
- * number of top-tier picks chosen across other layers.
- */
-export function pickTraits(w: WalletInput): { traits: LayerResult; names: LayerNames } {
-  const names: LayerNames = {};
-  const traits: LayerResult = {};
+  const tContracts = bucketBySteps(m.uniqueContracts, THRESHOLDS.uniqueContracts);
+  const tActive = bucketBySteps(m.activeDays, THRESHOLDS.activeDays);
+  const tGas = bucketBySteps(m.gasEth, THRESHOLDS.gasEth);
+  const tRank = bucketByStepsLowerIsBetter(m.monthlyRank, THRESHOLDS.monthlyRank);
+  const tNft = bucketBySteps(m.nftCount, THRESHOLDS.nftCount);
+  const tBal = bucketBySteps(m.balanceEth, THRESHOLDS.balanceEth);
+  const tTxs = bucketBySteps(m.totalTxs, THRESHOLDS.totalTxs);
 
-  // Background selection based on NFT holdings
-  const bgName = backgroundName(!!w.holds_builder, !!w.holds_introduced);
-  names['Background'] = bgName;
-  traits['Background'] = findTrait('Background', bgName);
+  // — mapping tiers → friendly names + prompt phrases (minimal anime style) —
+  const headwearNames = [
+    'Bare',
+    'Field Beanie',
+    'Multi-Tool Cap',
+    'Pro Visor',
+    'Vanguard Helmet',
+    'Omni Headdress',
+    'Prime Crown',
+  ];
+  const headwearPrompts = [
+    'no headwear',
+    'soft beanie hat, minimal logo',
+    'futuristic baseball cap, thin seams',
+    'sleek tech visor, subtle glow trim',
+    'light battle helmet, smooth plates',
+    'ornate cyber headdress, simple geometry',
+    'minimal crown band, very thin',
+  ];
+  const eyesNames = [
+    'Bare Eyes',
+    'Clear Glasses',
+    'Tinted Glasses',
+    'Tech Specs',
+    'HUD Visor',
+    'Full AR Visor',
+    'Prime AR Visor',
+  ];
+  const eyesPrompts = [
+    'natural anime eyes, glossy highlight',
+    'thin clear glasses, subtle reflection',
+    'tinted lenses, light reflection',
+    'smart glasses, faint UI glyphs',
+    'curved HUD visor, soft icons',
+    'full AR visor, restrained UI',
+    'full AR visor, clean icon band',
+  ];
+  const clothingNames = [
+    'Linen Tee',
+    'Canvas Jacket',
+    'Leather Vest',
+    'Alloy Armor',
+    'Composite Suit',
+    'Mythic Plate',
+    'Prime Plate',
+  ];
+  const clothingPrompts = [
+    'minimal tech tee',
+    'light canvas jacket, clean seams',
+    'sleek leather vest',
+    'light alloy chest piece, tiny accents',
+    'composite suit with very subtle panels',
+    'ornate plate, restrained gold lines',
+    'hero plate, very clean panels',
+  ];
+  const accessoryNames = [
+    'Mono Pin',
+    'Dual Scarf',
+    'Mosaic Pendant',
+    'Kaleido Strap',
+    'Prism Harness',
+    'Spectrum Orbs',
+    'Prime Orbs',
+  ];
+  const accessoryPrompts = [
+    'small chest pin',
+    'simple woven scarf',
+    'small pendant, faint glow',
+    'cross-body strap, neat cells',
+    'thin prism harness',
+    'two floating orbs near shoulders',
+    'three floating orbs near shoulders',
+  ];
+  const emblemNames = [
+    'None',
+    'Tin Ring',
+    'Bronze Circlet',
+    'Silver Crest',
+    'Gold Diadem',
+    'Platinum Halo',
+    'Prime Halo',
+    'Legend Halo',
+  ];
+  const emblemPrompts = [
+    'no emblem',
+    'thin ring above head',
+    'thin bronze circlet',
+    'small silver crest above head',
+    'small gold diadem above head',
+    'thin platinum halo',
+    'slightly brighter platinum halo',
+    'bright but thin halo',
+  ];
 
-  // Body selection based on gender gene
-  const gender = geneGender(w.wallet_birth_month);
-  const bodyName = gender === 'Male' ? 'Male' : 'Female';
-  names['Body'] = bodyName;
-  traits['Body'] = findTrait('Body', bodyName);
+  const headwearIdx = Math.min(tContracts, headwearPrompts.length - 1);
+  const eyesIdx = Math.min(tActive, eyesPrompts.length - 1);
+  const clothingIdx = Math.min(tTxs, clothingPrompts.length - 1);
+  const accessoryIdx = Math.min(Math.max(tNft, tBal), accessoryPrompts.length - 1);
+  const emblemIdx = Math.min(tRank, emblemPrompts.length - 1);
 
-  // Headwear based on unique contracts
-  names['Headwear'] = pickByRanges('Headwear', w.unique_contracts ?? 0);
-  traits['Headwear'] = findTrait('Headwear', names['Headwear']);
+  const bgHex = SPECIES[species].bgHex;
 
-  // Eyes based on active days
-  names['Eyes'] = pickByRanges('Eyes', w.active_days ?? 0);
-  traits['Eyes'] = findTrait('Eyes', names['Eyes']);
-
-  // Clothing based on total transactions
-  names['Clothing'] = pickByRanges('Clothing', w.total_txs ?? 0);
-  traits['Clothing'] = findTrait('Clothing', names['Clothing']);
-
-  // Accessory based on distinct tokens
-  names['Accessory'] = pickByRanges('Accessory', w.distinct_tokens ?? 0);
-  traits['Accessory'] = findTrait('Accessory', names['Accessory']);
-
-  // Aura based on wallet age days
-  names['Aura'] = pickByRanges('Aura', w.wallet_age_days ?? 0);
-  traits['Aura'] = findTrait('Aura', names['Aura']);
-
-  // Emblem based on dex trades and nft mints
-  const trad = w.dex_trades ?? 0;
-  const mints = w.nft_mints ?? 0;
-  let emblemName = 'Null Band';
-  if (trad + mints >= 100) emblemName = 'Prime Insignia';
-  else if (trad + mints >= 20) emblemName = 'Core Sigil';
-  else if (trad + mints >= 5) emblemName = 'Pulse Mark';
-  names['Emblem'] = emblemName;
-  traits['Emblem'] = findTrait('Emblem', emblemName);
-
-  // Optional signature based on number of top-tier picks
-  const topCount = countTopTiers(names);
-  if (topCount >= 5) {
-    names['Signature'] = 'Prime Forge';
-    traits['Signature'] = findTrait('Signature', 'Prime Forge');
-  } else if (topCount >= 3) {
-    names['Signature'] = 'Foundry Seal';
-    traits['Signature'] = findTrait('Signature', 'Foundry Seal');
-  }
-
-  return { traits, names };
+  return {
+    version: 2,
+    species,
+    styleLock: {
+      camera: 'waist_up',
+      lineStyle: 'bold_clean',
+      background: 'solid',
+      bgHex,
+    },
+    tiers: {
+      uniqueContracts: tContracts,
+      activeDays: tActive,
+      gasEth: tGas,
+      monthlyRank: tRank,
+      nftCount: tNft,
+      balanceEth: tBal,
+      totalTxs: tTxs,
+    },
+    names: {
+      headwear: headwearNames[headwearIdx],
+      eyes: eyesNames[eyesIdx],
+      clothing: clothingNames[clothingIdx],
+      accessory: accessoryNames[accessoryIdx],
+      emblem: emblemNames[emblemIdx],
+    },
+    promptParts: {
+      headwear: headwearPrompts[headwearIdx],
+      eyes: eyesPrompts[eyesIdx],
+      clothing: clothingPrompts[clothingIdx],
+      accessory: accessoryPrompts[accessoryIdx],
+      emblem: emblemPrompts[emblemIdx],
+    },
+  };
 }

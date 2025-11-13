@@ -322,7 +322,7 @@ export default function Page() {
     return coerceCopy(narrative) || coerceCopy(persona) || seeded;
   }, [narrative, persona, traits, address]);
 
-  // Locked prompt for image generation
+  // Locked prompt for image generation (only used as fallback/defaultPrompt in UI)
   const promptForImage = useMemo(() => {
     try {
       const p = buildLockedPrompt(traits);
@@ -332,9 +332,13 @@ export default function Page() {
 
   const anyStats = statsToShow as any;
   const rankStr = typeof anyStats?.globalRank === 'number' ? `#${anyStats.globalRank}` : '—';
+  const ageDays = statsToShow.walletAgeDays ?? 0;
+
   const statsForCard = [
-    { label: 'Rank',             value: rankStr },
-    { label: 'Age',              value: `${statsToShow.walletAgeDays ?? 0} days` },
+    { label: 'Rank', value: rankStr },
+    ...(ageDays > 0
+      ? [{ label: 'Age', value: `${ageDays} days` }]
+      : []),
     { label: 'Active Days',      value: String(statsToShow.uniqueDays ?? 0) },
     { label: 'Interactions',     value: String(statsToShow.totalContractInteractions ?? 0) },
     { label: 'Unique Contracts', value: String(statsToShow.uniqueContractInteractions ?? 0) },
@@ -342,6 +346,8 @@ export default function Page() {
   ];
 
   const subtitleAddr = address ? `${address.slice(0, 6)}…${address.slice(-4)}` : '';
+  const displayAddress = address || connectedAddress || '';
+
   const twoCol: React.CSSProperties = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'stretch' };
   const col: React.CSSProperties    = { display: 'flex', minHeight: 680 };
   const card: React.CSSProperties   = { flex: 1, display: 'flex', flexDirection: 'column' };
@@ -429,6 +435,10 @@ export default function Page() {
                       stats={statsForCard}
                       badgeText={selectedYm ? `YM ${selectedYm}` : 'ALL-TIME'}
                       logoHref="/base_logo.svg"
+                      // مهم: سیم‌کشی به generate.ts
+                      address={displayAddress || undefined}
+                      traitsJson={traits?.traitsJson ?? traits ?? null}
+                      persona={persona?.personaJson ?? persona ?? null}
                     />
                   </div>
                 </div>

@@ -1,3 +1,4 @@
+// components/CardPreviewMint.tsx
 'use client';
 
 import React, { useEffect, useState } from 'react';
@@ -9,8 +10,8 @@ import { gateAbi } from '../lib/abi/gate';
 type Stat = { label: string; value: string };
 
 type Props = {
-  // UI bits
-  defaultPrompt: string;   // only for transparency display; server builds a locked prompt
+  // UI
+  defaultPrompt: string;   // transparency only; server builds locked prompt
   title?: string;
   subtitle?: string;
   stats?: Stat[];
@@ -18,10 +19,10 @@ type Props = {
   placeholderSrc?: string;
   logoHref?: string;
 
-  // NEW: inputs for /api/generate (address/species resolved server-side)
-  address?: string;        // if not provided, fallback to connected wallet
-  traitsJson?: any;        // pass-through to server (optional)
-  persona?: any;           // pass-through to server (optional)
+  // Optional API inputs
+  address?: string;        // falls back to connected wallet
+  traitsJson?: any;
+  persona?: any;
 };
 
 // ---------- Small utils ----------
@@ -93,7 +94,7 @@ function toNumberSafe(x: unknown, fallback = 0): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
-// ---------- Build SVG overlay (client-side string; server composes on top of the base image)
+// ---------- Build SVG overlay (client-side); server composes it on base image ----------
 function buildOverlaySVG(
   title: string | undefined,
   addressStr: string | undefined,
@@ -297,10 +298,10 @@ export default function CardPreviewMint({
 
   const { writeContractAsync } = useWriteContract();
 
-  const [baseImg, setBaseImg] = useState<string | null>(null);  // data URL produced by /api/generate
-  const [cardImg, setCardImg] = useState<string | null>(null);  // gateway URL after compose-store
+  const [baseImg, setBaseImg] = useState<string | null>(null);  // data URL from /api/generate
+  const [cardImg, setCardImg] = useState<string | null>(null);  // gateway/data URL after compose-store
   const [cardHash, setCardHash] = useState<string | null>(null); // sha256 hex from server
-  const [tokenUri, setTokenUri] = useState<string | null>(null); // ipfs:// metadata
+  const [tokenUri, setTokenUri] = useState<string | null>(null); // ipfs:// or data: metadata
   const [busy, setBusy] = useState<{ gen?: boolean; compose?: boolean; mint?: boolean; paying?: boolean }>({});
   const [error, setError] = useState<string | null>(null);
   const [payTx, setPayTx] = useState<string | null>(null);
@@ -323,7 +324,6 @@ export default function CardPreviewMint({
 
   const effectiveAddress = addressProp || connected || '';
   const preview = cardImg || baseImg || placeholderSrc;
-  const showLiveOverlay = !cardImg;
 
   const mintFeeEth = fmtEth(mintFeeWei);
   const genFeeEth  = fmtEth(genFeeWei);
@@ -356,7 +356,7 @@ export default function CardPreviewMint({
     a.remove();
   }
 
-  // --- Pay (optional) + Generate via /api/generate (uses species base image as reference) ---
+  // --- Pay (optional) + Generate via /api/generate ---
   async function handleGenerate() {
     setError(null);
 
@@ -393,7 +393,7 @@ export default function CardPreviewMint({
       setBusy(b => ({ ...b, paying: false }));
     }
 
-    // Call our image API (server uses locked prompt + species base reference)
+    // Call our image API
     setBusy(b => ({ ...b, gen: true }));
     try {
       const r = await fetch('/api/generate', {
@@ -404,7 +404,6 @@ export default function CardPreviewMint({
           address: effectiveAddress,
           traitsJson: traitsJson ?? null,
           persona: persona ?? null,
-          // payTxHash is optional (ignored server-side unless you wire it)
           payTxHash: payHash || undefined,
         }),
       });
@@ -422,7 +421,7 @@ export default function CardPreviewMint({
     }
   }
 
-  // --- Compose → Store(IPFS) ---
+  // --- Compose → Store (IPFS/data:) ---
   async function composeCard() {
     if (!baseImg || !effectiveAddress) { setError('Generate first (and connect wallet).'); return; }
     setBusy(b => ({ ...b, compose: true })); setError(null);
@@ -527,6 +526,9 @@ export default function CardPreviewMint({
     )
   );
 
+  const anyBusy = busy.paying || busy.gen || busy.compose || busy.mint;
+  const busyText = busy.paying ? 'Paying…' : busy.gen ? 'Generating…' : busy.compose ? 'Composing…' : busy.mint ? 'Minting…' : '';
+
   return (
     <div className="grid gap-3">
       {/* Buttons */}
@@ -591,6 +593,27 @@ export default function CardPreviewMint({
               badgeText={badgeText}
               logoHref={logoHref}
             />
+          </div>
+        )}
+
+        {/* Busy overlay loader */}
+        {anyBusy && (
+          <div style={{
+            position:'absolute', inset:0, background:'rgba(15,23,42,.45)',
+            display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:14, color:'#fff'
+          }}>
+            <div style={{
+              width:48, height:48, borderRadius:'50%',
+              border:'4px solid rgba(255,255,255,.25)',
+              borderTopColor:'#fff', animation:'spin 1s linear infinite'
+            }} />
+            <div style={{fontWeight:800}}>{busyText}</div>
+            <style jsx>{`@keyframes spin {to {transform: rotate(360deg);}}`}</style>
+            <div style={{width:'70%', height:6, borderRadius:6, background:'rgba(255,255,255,.25)', overflow:'hidden'}}>
+              <div style={{width:'60%', height:'100%', borderRadius:6, background:'#fff', animation:'bar 1.5s ease-in-out infinite'}} />
+            </div>
+            <style jsx>{`@keyframes bar { 0%{transform:translateX(-60%)} 50%{transform:translateX(20%)} 100%{transform:translateX(120%)} }`}</style>
+            <div style={{fontSize:12, opacity:.9}}>Don’t refresh. This can take a few seconds.</div>
           </div>
         )}
       </div>

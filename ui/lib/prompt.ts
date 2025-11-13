@@ -1,95 +1,126 @@
 // lib/prompt.ts
-/**
- * Deterministic, locked prompt builder for Base Persona images.
- * - Visual style is LOCKED (camera / lighting / background / composition / aspect).
- * - Only the SUBJECT varies via `species` (fox | dolphin | owl | panda).
- * - No HTML/tags in the prompt.
- */
+import type { Species } from './species';
 
-export type SpeciesId = 'fox' | 'dolphin' | 'owl' | 'panda';
-
-export type StyleLock = {
-  camera?: string;        // e.g., "waist-up portrait"
-  lighting?: string;      // e.g., "cinematic studio lighting"
-  bg?: string;            // e.g., "brand_orb_v1" | free text
-  composition?: string;   // e.g., "symmetrical composition"
-  aspect?: string;        // e.g., "1:1 aspect ratio"
+export type TraitBins = {
+  uniqueContracts: number;
+  activeDays: number;
+  gasPaidEth: number;
+  monthlyRank: number;       // lower = better
+  nftCount: number;
+  balanceEth: number;
+  txCount: number;
 };
 
-export type BuildPromptInput = {
-  species?: SpeciesId | string;  // preferred: 'fox' | 'dolphin' | 'owl' | 'panda'
-  styleLock?: StyleLock;         // locks for camera/lighting/bg/composition/aspect
-  paletteId?: number;            // ignored here but kept for compat
-  [key: string]: any;            // tolerate extra fields (traits/persona, etc.)
-};
+const pastelBg = [
+  'soft pastel blue','soft pastel mint','soft pastel lavender',
+  'soft pastel peach','soft pastel lilac','soft pastel teal'
+];
 
-const SPECIES_CUES: Record<SpeciesId, string> = {
-  fox:     'waist-up portrait of a stylized fox character (smart, agile, playful but focused)',
-  dolphin: 'waist-up portrait of a stylized dolphin character (curious, precise, calm under pressure)',
-  owl:     'waist-up portrait of a stylized owl character (observant, thoughtful, unflappable)',
-  panda:   'waist-up portrait of a stylized panda character (steady, friendly, quietly determined)',
-};
+// مینیمال + کارتونی + خطوط ثابت
+const BASE_STYLE =
+  'flat vector-style, minimal anime/cartoon, thick uniform outline, simple cel shading, clean shapes, no photorealism, no textures, no bloom, no lens flares';
 
-function normalizeSpecies(x?: string): SpeciesId {
-  const s = (x || '').toLowerCase();
-  if (s.includes('dolphin')) return 'dolphin';
-  if (s.includes('owl'))     return 'owl';
-  if (s.includes('panda'))   return 'panda';
-  return 'fox';
+const NEGATIVE =
+  'photorealistic, realistic skin, gritty texture, complex patterns, text watermark, logo watermark, heavy detail, 3D render, extra limbs, background clutter';
+
+function pick<T>(arr: T[], seed: number) { return arr[seed % arr.length]; }
+
+function tierWord(value: number, stops: number[], words: string[]) {
+  const arr = [...stops, Infinity];
+  const idx = arr.findIndex(s => value < s);
+  return words[Math.max(0, Math.min(words.length - 1, idx))];
 }
 
-function normalizeStyleLock(lock?: StyleLock) {
-  const camera      = lock?.camera      || 'waist-up portrait';
-  const lighting    = lock?.lighting    || 'cinematic studio lighting';
-  const composition = lock?.composition || 'symmetrical composition';
-  const aspect      = lock?.aspect      || '1:1 aspect ratio';
+export function buildLockedPromptMinimal(opts: {
+  species: Species;
+  traits: TraitBins;
+  seed: number;
+}) {
+  const { species, traits, seed } = opts;
 
-  // brand_orb_v1 → Base-blue orbital gradient with soft particles
-  const bg = (() => {
-    const k = (lock?.bg || '').toLowerCase();
-    if (k === 'brand_orb_v1') return 'Base-blue orbital gradient background with soft particles';
-    if (k) return k;
-    return 'deep electric-blue gradient background';
-  })();
+  // بکگراند ثابتِ پاستیلی
+  const bg = pick(pastelBg, seed);
 
-  return { camera, lighting, composition, aspect, bg };
+  // مپ تریت‌ها → عناصر کم و واضح
+  const headwear = tierWord(traits.uniqueContracts, [20,50,100,200,500,1000], [
+    'no headwear',
+    'simple beanie',
+    'baseball cap',
+    'thin tech visor',
+    'sleek helmet',
+    'ornate helm',
+    'heroic crest'
+  ]);
+
+  const eyes = tierWord(traits.activeDays, [10,20,50,100,200,500], [
+    'plain eyes',
+    'clear glasses',
+    'tinted glasses',
+    'compact hud glasses',
+    'wide hud visor',
+    'full AR visor'
+  ]);
+
+  const chest = tierWord(traits.txCount, [100,200,500,1000,2000,3000], [
+    'plain tee',
+    'light jacket',
+    'minimal vest',
+    'light armor',
+    'composite suit',
+    'mythic suit'
+  ]);
+
+  const emblem = tierWord(traits.balanceEth, [0.001,0.002,0.01,0.02,0.05,0.1,0.2,0.5,1], [
+    'no emblem',
+    'tiny tin ring',
+    'thin silver ring',
+    'bronze circlet',
+    'silver crest',
+    'small gold crest',
+    'gold diadem',
+    'bright halo',
+    'platinum halo'
+  ]);
+
+  const accessory = tierWord(traits.nftCount, [1,10,50,100,200,500], [
+    'no accessory',
+    'small pin',
+    'woven scarf',
+    'gem pendant',
+    'bandolier',
+    'prism harness'
+  ]);
+
+  // رتبه ماهانه: کمتر = بهتر → نور ملایم
+  const aura = tierWord(traits.monthlyRank, [1000,5000,25000,50000,100000,250000,500000], [
+    'no aura',
+    'faint white aura',
+    'soft blue aura',
+    'soft purple aura',
+    'mild gold aura',
+    'bright gold aura',
+    'intense platinum aura'
+  ]);
+
+  const gasHint = tierWord(traits.gasPaidEth, [0.001,0.002,0.005,0.01,0.02,0.05,0.1], [
+    'no energy sparks',
+    'few tiny sparks',
+    'tiny sparks',
+    'small sparks',
+    'medium sparks',
+    'many sparks',
+    'strong sparks'
+  ]);
+
+  // بدنه‌ی ثابت: حیوان آنتروپو‌مورفیک + نیم‌تنه، روبه‌رو، متقارن
+  const subject = `waist-up symmetrical portrait of an anthropomorphic ${species} hero, front view, centered`;
+
+  // پرامپت قفل شده
+  const prompt =
+    `${subject}; ${BASE_STYLE}; pastel solid background (${bg}); ` +
+    `headwear: ${headwear}; eyes: ${eyes}; chestwear: ${chest}; accessory: ${accessory}; emblem: ${emblem}; ` +
+    `subtle aura: ${aura}; effects: ${gasHint}; ` +
+    `keep silhouette consistent for ${species}; fixed line weight; clean vector look; background must be flat and untextured`;
+
+  return { prompt, negative: NEGATIVE };
 }
-
-function clean(s: string): string {
-  // remove any HTML artifacts and collapse whitespace
-  return s.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
-}
-
-/** Core builder (locked). */
-function _buildLockedPrompt(traits: BuildPromptInput): string {
-  const species = normalizeSpecies(
-    traits?.species ||
-    (traits as any)?.names?.species ||
-    (traits as any)?.persona?.species
-  );
-
-  const cue = SPECIES_CUES[species];
-  const { camera, lighting, composition, aspect, bg } = normalizeStyleLock(traits?.styleLock);
-
-  const parts = [
-    cue,                              // SUBJECT (only variable)
-    'stylized 3D render',             // STYLE LOCK
-    camera,                           // CAMERA LOCK
-    lighting,                         // LIGHTING LOCK
-    'ultra detailed, production-quality character render',
-    bg,                               // BACKGROUND LOCK
-    composition,                      // COMPOSITION LOCK
-    aspect,                           // ASPECT LOCK
-    'subtle Base-native energy, crisp edges, no text, no UI, no logos',
-  ];
-
-  return clean(parts.join(', '));
-}
-
-/* ---- Exports (backward compatible) ---- */
-// Some modules import named `buildLockedPrompt`, others import named `buildPrompt`,
-// and some use default import. Support all three.
-
-export const buildLockedPrompt = _buildLockedPrompt;
-export const buildPrompt = _buildLockedPrompt;       // alias for older callers
-export default _buildLockedPrompt;

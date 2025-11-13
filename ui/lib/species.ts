@@ -1,31 +1,16 @@
 // lib/species.ts
-export type SpeciesId = 'fox' | 'owl' | 'dolphin' | 'panda';
+export type Species =
+  | 'owl' | 'fox' | 'dolphin' | 'panda'
+  | 'tiger' | 'wolf' | 'cat' | 'whale';
 
-const NIBBLE_GROUPS: Record<SpeciesId, string[]> = {
-  fox:     ['0','4','8','c'],
-  owl:     ['1','5','9','d'],
-  dolphin: ['2','6','a','e'],
-  panda:   ['3','7','b','f'],
-};
+const SPECIES: Species[] = [
+  'owl','fox','dolphin','panda','tiger','wolf','cat','whale'
+];
 
-export function pickSpeciesByNibble(address: string): SpeciesId {
-  const a = (address || '').toLowerCase();
-  if (!/^0x[0-9a-f]{40}$/.test(a)) return 'fox';
-  const nibble = a[2];
-  for (const [species, group] of Object.entries(NIBBLE_GROUPS)) {
-    if (group.includes(nibble)) return species as SpeciesId;
-  }
-  return 'fox';
+export function pickSpeciesByNibble(addr: string): Species {
+  const m = addr?.match(/^0x([0-9a-fA-F]{40})$/);
+  if (!m) return 'owl';
+  const last = m[1].slice(-1);
+  const n = parseInt(last, 16);
+  return SPECIES[n % SPECIES.length];
 }
-
-export const SPECIES_STYLE: Record<SpeciesId, {
-  baseName: string;
-  camera: 'bust_3q';
-  bgLock: 'brand_orb_v1';
-  paletteHint: string;
-}> = {
-  fox:     { baseName: 'Fox',     camera: 'bust_3q', bgLock: 'brand_orb_v1', paletteHint: 'Base-blue & platinum' },
-  owl:     { baseName: 'Owl',     camera: 'bust_3q', bgLock: 'brand_orb_v1', paletteHint: 'Base-blue & platinum' },
-  dolphin: { baseName: 'Dolphin', camera: 'bust_3q', bgLock: 'brand_orb_v1', paletteHint: 'Base-blue & platinum' },
-  panda:   { baseName: 'Panda',   camera: 'bust_3q', bgLock: 'brand_orb_v1', paletteHint: 'Base-blue & platinum' },
-};
