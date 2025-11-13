@@ -32,6 +32,17 @@ type WalletMetricsProps = {
   onSelectionChange?: (ym: number) => void
 }
 
+/** traitsJson برای /api/generate */
+type ImageTraits = {
+  uniqueContracts: number;
+  activeDays: number;
+  gasPaidEth: number;
+  monthlyRank: number;
+  nftCount: number;
+  balanceEth: number;
+  txCount: number;
+}
+
 /** Dynamic chunks */
 const WalletMetricsComp = dynamic(() =>
   import('../components/WalletMetrics').then(m => (m as any).default || m),
@@ -46,7 +57,7 @@ const CardPreviewMint = dynamic(
 /** Small helpers */
 function rnd(a: number, b: number) { return a + (b - a) * Math.random() }
 function rint(a: number, b: number) { return Math.floor(rnd(a, b)) }
-function isAddr(s?: string) { return !!s && /^0x[a-fA-F0-9]{40}$/.test(s.trim()) }
+function isAddr(s?: string) { return !!s && /^0x[0-9a-fA-F]{40}$/.test(s.trim()) }
 
 /** Random metrics (only used if API metrics fail) */
 function buildRandomMetrics(addr: string): WalletStatRecord {
@@ -79,7 +90,7 @@ function speciesCueFor(s?: SpeciesId) {
   }
 }
 
-/** Locked image prompt built from traits locks */
+/** Locked image prompt built from traits locks (قدیمی؛ فقط برای UI به‌عنوان fallback) */
 function buildLockedPrompt(traitsResp: any): string {
   const t = traitsResp?.traitsJson || traitsResp || {};
   const species: SpeciesId | undefined = t?.species;
@@ -187,6 +198,9 @@ export default function Page() {
   const [monthOptions, setMonthOptions] = useState<MonthOpt[]>([]);
   const [selectedYm, setSelectedYm] = useState<number | null>(null);
 
+  /** traitsJson که به /api/generate پاس می‌دیم */
+  const [imageTraits, setImageTraits] = useState<ImageTraits | null>(null);
+
   useEffect(() => setMounted(true), []);
   useEffect(() => { if (isConnected && connectedAddress) setAddress(connectedAddress) }, [isConnected, connectedAddress]);
   useEffect(() => { setSelectedYm(null) }, [address]);
@@ -204,11 +218,17 @@ export default function Page() {
     try {
       // 1) lifetime metrics
       let stats: WalletStatRecord;
+      let imageTraitsNext: ImageTraits;
+
       try {
         const r = await fetch(`/api/metrics?address=${addr}`, { cache: 'no-store' });
         if (!r.ok) throw new Error(`metrics ${r.status}`);
         const m = await r.json();
-        const gRank = Number(m?.global_rank ?? m?.rank_global ?? m?.rank_lifetime ?? m?.rank ?? m?.rank_all ?? 0);
+
+        const gRank = Number(
+          m?.global_rank ?? m?.rank_global ?? m?.rank_lifetime ?? m?.rank ?? m?.rank_all ?? 0
+        );
+
         stats = {
           address: addr,
           baseBuilderHolder: !!m?.base_builder_holder,
@@ -226,10 +246,49 @@ export default function Page() {
           uniqueNftContractCount: Number(m?.nft_mints ?? m?.nft_contracts ?? 0),
           ...(gRank ? { globalRank: gRank } : {}),
         };
+
+        // --- FIXED: monthlyRank بدون قاطی شدن ?? با || ---
+        const rawMonthlyRank =
+          m?.ranks?.overall?.rank ??
+          m?.ranks?.activity?.rank ??
+          (gRank && gRank > 0 ? gRank : undefined);
+
+        const monthlyRank = Number(
+          rawMonthlyRank ?? 500000
+        );
+
+        // traitsJson برای /api/generate (RawTraits)
+        imageTraitsNext = {
+          uniqueContracts: Number(m?.uniq_contracts ?? 0),
+          activeDays: Number(m?.active_days ?? 0),
+          gasPaidEth: Number(m?.gas_spent_eth ?? 0),
+          monthlyRank,
+          nftCount: Number(m?.nft_mints ?? m?.nft_contracts ?? 0),
+          balanceEth: Number(m?.avg_balance_eth ?? 0),
+          txCount:
+            Number(m?.tx_count_native ?? m?.tx_count ?? 0) +
+            Number(m?.tx_count_token ?? 0),
+        };
       } catch {
+        // fallback: رندوم
         stats = buildRandomMetrics(addr);
+        const anyStats: any = stats;
+
+        imageTraitsNext = {
+          uniqueContracts: stats.uniqueContractInteractions ?? 0,
+          activeDays: stats.uniqueDays ?? 0,
+          gasPaidEth: 0,
+          monthlyRank: typeof anyStats?.globalRank === 'number'
+            ? Number(anyStats.globalRank)
+            : 500000,
+          nftCount: stats.uniqueNftContractCount ?? 0,
+          balanceEth: stats.balanceETH ?? 0,
+          txCount: (stats.nativeTxCount ?? 0) + (stats.tokenTxCount ?? 0),
+        };
       }
+
       setWalletStats(stats);
+      setImageTraits(imageTraitsNext);
 
       // 2) qualitative persona (no raw numbers in text)
       const metricsPersona = {
@@ -316,13 +375,22 @@ export default function Page() {
     [walletStats, address]
   );
 
+  // آدرس مؤثر برای کارت و زیرنویس (یا کانکت‌شده، یا تایپ‌شده)
+  const effectivePersonaAddress = useMemo(
+    () => (isConnected && connectedAddress) ? connectedAddress : address,
+    [isConnected, connectedAddress, address]
+  );
+
   // Persona text: narrative → persona → seeded demo (never empty)
   const personaCopy = useMemo(() => {
-    const seeded = demoPersona(address, (traits?.traitsJson?.species ?? traits?.species) as SpeciesId | undefined);
+    const seeded = demoPersona(
+      effectivePersonaAddress,
+      (traits?.traitsJson?.species ?? traits?.species) as SpeciesId | undefined
+    );
     return coerceCopy(narrative) || coerceCopy(persona) || seeded;
-  }, [narrative, persona, traits, address]);
+  }, [narrative, persona, traits, effectivePersonaAddress]);
 
-  // Locked prompt for image generation (only used as fallback/defaultPrompt in UI)
+  // Locked prompt for image generation (فقط برای UI؛ /api/generate خودش پرامپت قفل‌شده می‌سازد)
   const promptForImage = useMemo(() => {
     try {
       const p = buildLockedPrompt(traits);
@@ -332,21 +400,18 @@ export default function Page() {
 
   const anyStats = statsToShow as any;
   const rankStr = typeof anyStats?.globalRank === 'number' ? `#${anyStats.globalRank}` : '—';
-  const ageDays = statsToShow.walletAgeDays ?? 0;
-
   const statsForCard = [
-    { label: 'Rank', value: rankStr },
-    ...(ageDays > 0
-      ? [{ label: 'Age', value: `${ageDays} days` }]
-      : []),
+    { label: 'Rank',             value: rankStr },
+    { label: 'Age',              value: `${statsToShow.walletAgeDays ?? 0} days` },
     { label: 'Active Days',      value: String(statsToShow.uniqueDays ?? 0) },
     { label: 'Interactions',     value: String(statsToShow.totalContractInteractions ?? 0) },
     { label: 'Unique Contracts', value: String(statsToShow.uniqueContractInteractions ?? 0) },
     { label: 'Volume',           value: `${(statsToShow.volumeETH ?? 0).toFixed(2)} ETH` },
   ];
 
-  const subtitleAddr = address ? `${address.slice(0, 6)}…${address.slice(-4)}` : '';
-  const displayAddress = address || connectedAddress || '';
+  const subtitleAddr = effectivePersonaAddress
+    ? `${effectivePersonaAddress.slice(0, 6)}…${effectivePersonaAddress.slice(-4)}`
+    : '';
 
   const twoCol: React.CSSProperties = { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'stretch' };
   const col: React.CSSProperties    = { display: 'flex', minHeight: 680 };
@@ -402,7 +467,7 @@ export default function Page() {
             {mounted && (
               <ClientBoundary>
                 <WalletMetricsComp
-                  address={address || ''}
+                  address={effectivePersonaAddress || ''}
                   selectedYm={selectedYm}
                   onMonthsLoaded={handleMonthsLoaded}
                   onSelectionChange={handleSelectionChange}
@@ -435,10 +500,9 @@ export default function Page() {
                       stats={statsForCard}
                       badgeText={selectedYm ? `YM ${selectedYm}` : 'ALL-TIME'}
                       logoHref="/base_logo.svg"
-                      // مهم: سیم‌کشی به generate.ts
-                      address={displayAddress || undefined}
-                      traitsJson={traits?.traitsJson ?? traits ?? null}
-                      persona={persona?.personaJson ?? persona ?? null}
+                      address={effectivePersonaAddress || ''}
+                      traitsJson={imageTraits || undefined}
+                      persona={persona}
                     />
                   </div>
                 </div>
