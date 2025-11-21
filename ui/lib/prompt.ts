@@ -249,7 +249,8 @@ export function buildAnimeLitePrompt(
   species: Species,
   opts?: { seed?: number },
 ): { prompt: string; negative: string } {
-  const seed = opts?.seed ?? (Number(process.env.IMG_MASTER_SEED ?? '424242') || 424242);
+  const seed =
+    opts?.seed ?? (Number(process.env.IMG_MASTER_SEED ?? '424242') || 424242);
 
   const bg =
     selection.styleLock?.bgColorHex ||
@@ -268,12 +269,8 @@ export function buildAnimeLitePrompt(
   const subject =
     `waist-up portrait of an anthropomorphic ${species} character, front view, centered, clean silhouette`;
 
-  const subjectCue = selection.styleLock?.speciesCue
-    ? `, with ${selection.styleLock.speciesCue}`
-    : '';
-
   const prompt =
-    `${subject}${subjectCue}; ` +
+    `${subject}; ` +
     `${BASE_STYLE}; ` +
     `solid pastel background (${bg}); ` +
     `${traitLines}; ` +
