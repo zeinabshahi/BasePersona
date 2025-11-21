@@ -3,7 +3,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { buildAnimeLitePrompt } from '../../lib/prompt';
 import type { TraitSelectionLite } from '../../lib/traits/minimal';
 
-// گونه‌های قابل‌قبول برای کاراکتر (لوکال، بدون import)
+// گونه‌های قابل‌قبول برای کاراکتر
 type SpeciesId =
   | 'owl'
   | 'fox'
@@ -14,14 +14,9 @@ type SpeciesId =
   | 'cheetah'
   | 'dolphin';
 
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse,
-) {
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
-    return res
-      .status(405)
-      .json({ ok: false, error: 'method_not_allowed' });
+    return res.status(405).json({ ok: false, error: 'method_not_allowed' });
   }
 
   try {
@@ -41,9 +36,8 @@ export default async function handler(
 
     return res.status(200).json({ ok: true, prompt });
   } catch (e: any) {
-    return res.status(500).json({
-      ok: false,
-      error: e?.message || 'prompt_failed',
-    });
+    return res
+      .status(500)
+      .json({ ok: false, error: e?.message || 'prompt_failed' });
   }
 }
