@@ -1,5 +1,6 @@
 // lib/prompt.ts
 import type { Species } from './species';
+import type { TraitSelectionLite } from './traits/minimal';
 
 export type TraitBins = {
   uniqueContracts: number;
@@ -236,5 +237,48 @@ export function buildPrompt(traits: any): string {
   } catch {
     // در بدترین حالت یه پرامپت جنریک ولی تمیز
     return 'waist-up portrait of a Base-native onchain persona, flat vector-style, minimal cartoon, thick uniform outline, soft pastel background, 1:1 aspect ratio';
+  }
+}
+
+/**
+ * سازگار با API قدیمی buildAnimeLitePrompt که توی pages/api/prompt.ts استفاده می‌شه.
+ * این تابع از TraitSelectionLite استفاده می‌کنه و یه پرامپت مینیمال انیمه می‌سازه.
+ */
+export function buildAnimeLitePrompt(
+  selection: TraitSelectionLite,
+  opts?: { seed?: number },
+) {
+  try {
+    const species = (selection?.styleLock?.species as Species) || ('owl' as Species);
+    const seed =
+      opts?.seed ??
+      (Number(process.env.IMG_MASTER_SEED ?? '424242') || 424242);
+
+    // یک subject ساده بر اساس species
+    const subject =
+      `waist-up anime portrait of an anthropomorphic ${species} avatar, front view, centered`;
+
+    const bgHex = selection?.styleLock?.bgColorHex || '#E6F0FF';
+
+    const detailParts = Object.values(selection?.traits || {})
+      .map((t) => {
+        const slot = String(t.slot || '').toLowerCase();
+        return `${slot}: ${t.prompt}`;
+      });
+
+    const prompt =
+      `${subject}; ${BASE_STYLE}; flat solid pastel background ${bgHex}; ` +
+      detailParts.join('; ') +
+      '; clean silhouette, no extra props, no complex background';
+
+    // از همون NEGATIVE مشترک استفاده می‌کنیم
+    return { prompt, negative: NEGATIVE };
+  } catch {
+    // fallback اگر هر مشکلی بود
+    return {
+      prompt:
+        'waist-up anime portrait of a Base-native onchain avatar, flat vector-style, minimal cartoon, soft pastel solid background, 1:1',
+      negative: NEGATIVE,
+    };
   }
 }
