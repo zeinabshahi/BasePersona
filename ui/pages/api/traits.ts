@@ -1,6 +1,6 @@
 // pages/api/traits.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { pickSpeciesByNibble, type SpeciesId } from '../../lib/species';
+import { pickSpeciesByNibble, type Species } from '../../lib/species';
 
 /* ---------------- Helpers ---------------- */
 
@@ -112,7 +112,7 @@ export default async function handler(
     }
 
     const addr = address as string;
-    const species: SpeciesId = pickSpeciesByNibble(addr);
+    const species: Species = pickSpeciesByNibble(addr);
 
     // ورودی‌های مختلف را normalize می‌کنیم
     const raw: RawTraits = {
