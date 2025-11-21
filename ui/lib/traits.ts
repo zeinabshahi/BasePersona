@@ -1,5 +1,4 @@
 // lib/traits.ts
-import { Species } from './species';
 
 export type Metrics = {
   uniqueContracts?: number;
@@ -40,8 +39,8 @@ function bucketByStepsLowerIsBetter(value: number, steps: number[]) {
   return idx;
 }
 
-// نوع ساده برای species، فقط برای راضی نگه داشتن TS
-type SpeciesId = string | number;
+// فقط برای اینکه TS راضی باشد، نوع species را ساده نگه می‌داریم
+export type SpeciesId = string | number;
 
 export type BuiltTraits = {
   version: 2;
@@ -202,10 +201,9 @@ export function pickTraits(
   const accessoryIdx = Math.min(Math.max(tNft, tBal), accessoryPrompts.length - 1);
   const emblemIdx = Math.min(tRank, emblemPrompts.length - 1);
 
-  // Species از ./species میاد؛ به any کست می‌کنیم که TS روی index غر نزنه
-  const bgHex =
-    (Species as any)?.[species]?.bgHex ??
-    '#020617';
+  // فعلاً بک‌گراند این سیستم قدیمی رو ثابت می‌گیریم؛
+  // چون رندر اصلی 3D جدید از مسیر /api/generate و visualTraits میاد.
+  const bgHex = '#020617';
 
   return {
     version: 2,
