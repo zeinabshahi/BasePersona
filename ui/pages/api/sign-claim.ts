@@ -4,7 +4,7 @@ import { privateKeyToAccount } from 'viem/accounts';
 import { Hex, isHex } from 'viem';
 
 type ClaimBody = {
-  to?: string;
+  to?: string;                // ورودی از کلاینت
   tokenURI?: string;
   imageHash?: Hex;
   deadline?: number | string;
@@ -73,8 +73,20 @@ export default async function handler(
         .json({ ok: false, error: 'missing_imageHash' });
     }
 
+    // ولیدیشن ساده‌ی آدرس و هش از نظر فرم
+    if (!isHex(to) || to.length !== 42) {
+      return res
+        .status(400)
+        .json({ ok: false, error: 'bad_to_address' });
+    }
+    if (!isHex(imageHash) || imageHash.length !== 66) {
+      return res
+        .status(400)
+        .json({ ok: false, error: 'bad_imageHash' });
+    }
+
     const d = BigInt(deadline ?? 0);
-    const n = BigInt(nonce ?? 0n);
+    const n = BigInt(nonce ?? 0);
 
     const account = getAccount();
 
@@ -95,10 +107,17 @@ export default async function handler(
       ],
     } as const;
 
-    const message = {
-      to,
+    // این‌جا تایپ رو طوری می‌سازیم که با انتظار viem یکی باشه
+    const message: {
+      to: `0x${string}`;
+      tokenURI: string;
+      imageHash: `0x${string}`;
+      deadline: bigint;
+      nonce: bigint;
+    } = {
+      to: to as `0x${string}`,
       tokenURI,
-      imageHash,
+      imageHash: imageHash as `0x${string}`,
       deadline: d,
       nonce: n,
     };
