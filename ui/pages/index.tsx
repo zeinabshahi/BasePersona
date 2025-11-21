@@ -61,6 +61,28 @@ function rnd(a: number, b: number) { return a + (b - a) * Math.random() }
 function rint(a: number, b: number) { return Math.floor(rnd(a, b)) }
 function isAddr(s?: string) { return !!s && /^0x[0-9a-fA-F]{40}$/.test(s.trim()) }
 
+/** Number formatting helpers (برای کارت و کامپوز) */
+function fmtCompactInt(n: number): string {
+  if (!Number.isFinite(n)) return '—';
+  const abs = Math.abs(n);
+  if (abs < 1_000) {
+    return new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(Math.round(n));
+  }
+  return new Intl.NumberFormat('en-US', {
+    notation: 'compact',
+    maximumFractionDigits: 1,
+  }).format(Math.round(n));
+}
+
+function fmtEth(n: number): string {
+  if (!Number.isFinite(n) || n === 0) return '0';
+  if (Math.abs(n) < 0.0001) return n.toExponential(2);
+  if (Math.abs(n) < 0.01) return n.toFixed(4);
+  if (Math.abs(n) < 1) return n.toFixed(3);
+  if (Math.abs(n) < 10) return n.toFixed(2);
+  return n.toFixed(2);
+}
+
 /** Random metrics (only used if API metrics fail) */
 function buildRandomMetrics(addr: string): WalletStatRecord {
   return {
@@ -404,7 +426,6 @@ export default function Page() {
       typeof anyStats.globalRank === 'number' && anyStats.globalRank > 0
         ? anyStats.globalRank
         : 0;
-    const rankStr = rankVal ? `#${rankVal.toLocaleString()}` : '—';
 
     const activeDays = statsToShow.uniqueDays ?? 0;
     const tx = (statsToShow.nativeTxCount ?? 0) + (statsToShow.tokenTxCount ?? 0);
@@ -412,11 +433,11 @@ export default function Page() {
     const balance = statsToShow.balanceETH ?? 0;
 
     return [
-      { label: 'Rank',             value: rankStr },
-      { label: 'Active Days',      value: String(activeDays) },
-      { label: 'Tx',               value: String(tx) },
-      { label: 'Unique Contracts', value: String(uniqContracts) },
-      { label: 'Balance',          value: `${balance.toFixed(2)} ETH` },
+      { label: 'Rank',             value: rankVal ? `#${fmtCompactInt(rankVal)}` : '—' },
+      { label: 'Active Days',      value: fmtCompactInt(activeDays) },
+      { label: 'Total Tx',         value: fmtCompactInt(tx) },
+      { label: 'Unique Contracts', value: fmtCompactInt(uniqContracts) },
+      { label: 'Avg Balance',      value: `${fmtEth(balance)} ETH` },
     ];
   }, [statsToShow]);
 

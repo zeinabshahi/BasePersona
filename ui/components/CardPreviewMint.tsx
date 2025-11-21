@@ -123,100 +123,125 @@ function buildOverlaySVG(
   logoHref: string = '/base_logo.svg', // فقط برای سازگاری امضاء
 ): string {
   const stats = Array.isArray(statsIn) ? statsIn : [];
-  const pad = 48;
-  const line = 46;
-  const max = Math.min(6, stats.length);
+  const max = Math.min(5, stats.length);       // حداکثر ۵ ردیف روی تصویر نهایی
 
-  const rows = Array.from({ length: max })
-    .map((_, i) => {
-      const y = 1024 - pad - 20 - (max - 1 - i) * line;
-      const s = stats[i];
+  const safeStats = stats
+    .slice(0, max)
+    .map((s) => ({
+      label: (s?.label ?? '').toString(),
+      value: (s?.value ?? '').toString(),
+    }));
+
+  const padX = 80;
+  const padBottom = 80;
+  const rowHeight = 60;
+
+  const rows = safeStats
+    .map((row, i) => {
+      const rowsCount = safeStats.length || 1;
+      const yBase = 1024 - padBottom - (rowsCount - 1 - i) * rowHeight;
+
+      const rectY = yBase - 42;
+      const labelY = yBase - 18;
+      const valueY = yBase + 8;
+
+      const label = escapeXml(row.label.toUpperCase());
+      const value = escapeXml(row.value);
+
       return `
-        <text
-          x="${pad}"
-          y="${y}"
-          fill="#e5efff"
-          stroke="#020617"
-          stroke-width="1.2"
-          paint-order="stroke fill"
-          style="font:600 28px Inter,Segoe UI,Arial;"
-        >
-          ${escapeXml(s.label)}:
-          <tspan
-            fill="#facc15"
-            stroke="#020617"
-            stroke-width="1.2"
-            paint-order="stroke fill"
-            style="font-weight:800;"
-          >
-            ${escapeXml(' ' + s.value)}
-          </tspan>
-        </text>`;
+      <g>
+        <!-- پس‌زمینه نیمه‌شفاف هر ردیف -->
+        <rect x="${padX - 12}" y="${rectY}" width="440" height="52" rx="20" ry="20"
+              fill="#020617" fill-opacity="0.80" />
+        <!-- نوار آبی کناری -->
+        <rect x="${padX - 12}" y="${rectY}" width="6" height="52" rx="3" ry="3"
+              fill="#38BDF8" />
+
+        <!-- لیبل -->
+        <text x="${padX + 16}" y="${labelY}"
+              fill="#9CA3AF"
+              font-size="18"
+              font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"
+              letter-spacing="0.16em">
+          ${label}
+        </text>
+
+        <!-- مقدار -->
+        <text x="${padX + 16}" y="${valueY}"
+              fill="#F9FAFB"
+              font-size="26"
+              font-weight="600"
+              font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+          ${value}
+        </text>
+      </g>`;
     })
     .join('\n');
 
-  const titleEl = title
+  const titleSafe = title ? escapeXml(title) : '';
+  const addrSafe = addressStr ? escapeAddress(addressStr) : '';
+
+  const titleBlock = titleSafe
     ? `
-      <text
-        x="${pad}"
-        y="${pad + 14}"
-        fill="#ffffff"
-        stroke="#020617"
-        stroke-width="2"
-        paint-order="stroke fill"
-        style="font:800 42px Inter,Segoe UI,Arial;"
-      >
-        ${escapeXml(title)}
-      </text>`
+    <g>
+      <text x="96" y="140"
+            fill="#F9FAFB"
+            font-size="40"
+            font-weight="700"
+            font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+        ${titleSafe}
+      </text>
+    </g>`
     : '';
 
-  const addrEl = addressStr
+  const addrBlock = addrSafe
     ? `
-      <text
-        x="${pad}"
-        y="${pad + (title ? 58 : 52)}"
-        fill="#e5efff"
-        stroke="#020617"
-        stroke-width="1.2"
-        paint-order="stroke fill"
-        style="font:600 28px Inter,Segoe UI,Arial;"
-      >
-        ${escapeAddress(addressStr)}
-      </text>`
+    <g opacity="0.9">
+      <rect x="96" y="154" rx="999" ry="999" width="260" height="40"
+            fill="#020617" fill-opacity="0.7" />
+      <text x="116" y="181"
+            fill="#9CA3AF"
+            font-size="20"
+            font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+        ${addrSafe}
+      </text>
+    </g>`
     : '';
 
   return `
-<svg viewBox="0 0 1024 1024" preserveAspectRatio="none" width="1024" height="1024" xmlns="http://www.w3.org/2000/svg">
+<svg viewBox="0 0 1024 1024"
+     preserveAspectRatio="none"
+     width="1024"
+     height="1024"
+     xmlns="http://www.w3.org/2000/svg">
   <defs>
     <linearGradient id="topFade" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="#000000" stop-opacity="0.55" />
+      <stop offset="0%"  stop-color="#000000" stop-opacity="0.55" />
       <stop offset="60%" stop-color="#000000" stop-opacity="0" />
     </linearGradient>
     <linearGradient id="bottomFade" x1="0" y1="1" x2="0" y2="0">
-      <stop offset="0%" stop-color="#000000" stop-opacity="0.50" />
+      <stop offset="0%"  stop-color="#000000" stop-opacity="0.50" />
       <stop offset="55%" stop-color="#000000" stop-opacity="0" />
     </linearGradient>
   </defs>
 
-  <!-- top and bottom fades مثل قبل -->
-  <rect width="1024" height="430" fill="url(#topFade)" />
-  <rect y="594" width="1024" height="430" fill="url(#bottomFade)" />
+  <!-- شیدر بالا و پایین برای خوانایی متن -->
+  <rect x="0" y="0"    width="1024" height="260" fill="url(#topFade)" />
+  <rect x="0" y="764"  width="1024" height="260" fill="url(#bottomFade)" />
 
-  <!-- Base logo بالا راست: فقط مربع آبی ساده -->
-  <rect
-    x="924"
-    y="32"
-    width="64"
-    height="64"
-    rx="16"
-    ry="16"
-    fill="#0052ff"
-  />
+  <!-- لوگوی مربع پایینی (گوشه بالا راست کارت) -->
+  <rect x="872" y="104" width="40" height="40" rx="12" ry="12"
+        fill="#0EA5E9" />
+  <rect x="882" y="114" width="20" height="20" rx="5" ry="5"
+        fill="#0F172A" fill-opacity="0.65" />
 
-  ${titleEl}
-  ${addrEl}
+  <!-- عنوان و آدرس کوتاه -->
+  ${titleBlock}
+  ${addrBlock}
+
+  <!-- ردیف‌های استت‌ها -->
   ${rows}
-</svg>`.trim();
+</svg>`;
 }
 
 // ---------- Live overlay (for on-page preview) ----------
