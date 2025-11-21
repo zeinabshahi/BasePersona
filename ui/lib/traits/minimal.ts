@@ -1,5 +1,5 @@
 // lib/traits/minimal.ts
-import type { SpeciesId } from '../species';
+import type { SpeciesId } from '../traits';
 import { SPECIES_CUES } from '../species';
 
 export type TraitSlot =
