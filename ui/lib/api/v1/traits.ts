@@ -1,7 +1,6 @@
 // lib/api/v1/traits.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { pickTraits } from '../../../lib/traits';
-import { buildPrompt } from '../../../lib/prompt';
 import { canonicalJson, toKeccakHex } from '../../../lib/utils';
 
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
@@ -10,45 +9,74 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
   }
 
   try {
-    const { address, metrics = {}, modelVersion = 1 } = (req.body || {}) as {
-      address?: string;
-      metrics?: any;
-      modelVersion?: number;
-    };
-
+    const { address, metrics = {}, modelVersion = 1 } = (req.body || {}) as any;
     if (!address) {
       return res.status(400).json({ ok: false, error: 'missing_address' });
     }
 
-    const w = {
-      address: String(address),
-      wallet_birth_month: Number(metrics.wallet_birth_month) || undefined,
-      wallet_age_days: Number(metrics.wallet_age_days) || undefined,
-      unique_contracts: Number(metrics.unique_contracts ?? 0),
-      active_days: Number(metrics.active_days ?? 0),
-      total_txs: Number(metrics.total_txs ?? 0),
-      distinct_tokens: Number(metrics.distinct_tokens ?? 0),
-      dex_trades: Number(metrics.dex_trades ?? 0),
-      nft_mints: Number(metrics.nft_mints ?? 0),
-      holds_builder: !!metrics.baseBuilderHolder,
-      holds_introduced: !!metrics.baseIntroducedHolder,
+    // متریک‌ها رو به فرمت جدید Metrics برای pickTraits نگه می‌داریم
+    const m = {
+      uniqueContracts: Number(
+        metrics.unique_contracts ??
+          metrics.uniqueContracts ??
+          0,
+      ),
+      activeDays: Number(
+        metrics.active_days ??
+          metrics.activeDays ??
+          0,
+      ),
+      gasEth: Number(
+        metrics.gas_eth ??
+          metrics.gasEth ??
+          0,
+      ),
+      monthlyRank: Number(
+        metrics.monthlyRank ??
+          metrics.monthly_rank ??
+          500000,
+      ),
+      nftCount: Number(
+        metrics.nft_mints ??
+          metrics.nftCount ??
+          0,
+      ),
+      balanceEth: Number(
+        metrics.balance_eth ??
+          metrics.balanceEth ??
+          0,
+      ),
+      totalTxs: Number(
+        metrics.total_txs ??
+          metrics.totalTxs ??
+          metrics.txCount ??
+          0,
+      ),
     };
 
-    // نسخه‌ی جدید: pickTraits یک BuiltTraits برمی‌گردونه
-    const built = pickTraits(w as any, {} as any);
+    // نسخه‌ی جدید pickTraits: m + species
+    // این endpoint v1 فقط برای دیباگ/سازگاری قدیمیه → یه species ثابت می‌ذاریم
+    const built = pickTraits(m as any, 'owl' as any);
     const names = built.names;
-    const prompt = buildPrompt(built);
+
+    // پرامپت جنریک فقط برای اینکه فیلد خالی نباشه
+    const prompt =
+      'waist-up portrait of a Base-native onchain persona, flat minimal cartoon/anime style, soft pastel background, 1:1 aspect ratio';
 
     const promptHash = toKeccakHex(
       canonicalJson({ names, prompt, modelVersion }),
     );
 
-    return res
-      .status(200)
-      .json({ ok: true, names, prompt, promptHash });
+    return res.status(200).json({
+      ok: true,
+      names,
+      prompt,
+      promptHash,
+    });
   } catch (e: any) {
-    return res
-      .status(500)
-      .json({ ok: false, error: e?.message || 'traits_failed' });
+    return res.status(500).json({
+      ok: false,
+      error: e?.message || 'traits_failed',
+    });
   }
 }
