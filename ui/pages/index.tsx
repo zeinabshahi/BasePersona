@@ -8,7 +8,9 @@ import { PersonaText } from '../components/PersonaText';
 import { useAccount } from 'wagmi';
 import type { WalletStatRecord } from '../components/WalletStats';
 import styles from '../components/frames.module.css';
-import { SpeciesId } from '../lib/species';
+import type { Species } from '../lib/species';
+
+type SpeciesId = Species;
 
 declare global { interface Window { ethereum?: any } }
 
