@@ -1,4 +1,4 @@
-// ui/pages/api/v1/persona.ts
+// lib/api/v1/persona.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
 import crypto from 'crypto';
 import { pickTraits } from '../../../lib/traits';
@@ -22,7 +22,9 @@ type Metrics = {
 };
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'POST') return res.status(405).json({ ok: false, error: 'method_not_allowed' });
+  if (req.method !== 'POST') {
+    return res.status(405).json({ ok: false, error: 'method_not_allowed' });
+  }
   if (!rateLimit(req, 40, 60_000)) return send429(res);
 
   try {
@@ -37,7 +39,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       llmProvider,                  // override اختیاری provider متن
     } = req.body || {};
 
-    if (!address) return res.status(400).json({ ok: false, error: 'missing_address' });
+    if (!address) {
+      return res.status(400).json({ ok: false, error: 'missing_address' });
+    }
 
     // امنیت: اگر INTERNAL_API_KEY تنظیم شده، برای تصویر لازم است
     if (!dryRun && !requireApiKey(req)) return send401(res);
@@ -57,8 +61,8 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       holds_introduced: !!metrics?.baseIntroducedHolder,
     };
 
-    // نسخه‌ی جدید: pickTraits یک آبجکت تجمیع‌شده می‌دهد (BuiltTraits)
-    const built = pickTraits(w as any);
+    // نسخه‌ی جدید: pickTraits دو آرگومان می‌خواهد
+    const built = pickTraits(w as any, {} as any);
     const names = built.names;
     const prompt = buildPrompt(built);
 
@@ -93,7 +97,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
       if (imgProvider) (process.env as any).IMG_PROVIDER = old;
 
-      const sha = crypto.createHash('sha256').update(Buffer.from(b64png, 'base64')).digest('hex');
+      const sha = crypto
+        .createHash('sha256')
+        .update(Buffer.from(b64png, 'base64'))
+        .digest('hex');
+
       imageSHA256 = '0x' + sha;
       imageURL = `data:image/png;base64,${b64png}`;
     }
