@@ -1,40 +1,28 @@
 // pages/api/compose-store.ts
 import type { NextApiRequest, NextApiResponse } from 'next';
 import sharp from 'sharp';
-import crypto from 'crypto';
+import { keccak256 } from 'viem';
 
-/**
- * اجازه بدیم بدنه‌ی درخواست تا چند مگابایت بزرگ‌تر باشه
- * چون baseImage به صورت data: URL میاد و می‌تونه >1MB باشه.
- */
-export const config = {
-  api: {
-    bodyParser: {
-      sizeLimit: '6mb', // در صورت نیاز می‌تونی بیشترش کنی
-    },
-  },
-};
+const PINATA_JWT = process.env.PINATA_JWT || '';
+const PINATA_GATEWAY = (process.env.PINATA_GATEWAY || 'https://gateway.pinata.cloud/ipfs').replace(/\/+$/, '');
 
-function dataUrlToBuffer(u: string) {
-  if (typeof u !== 'string' || !u.startsWith('data:')) {
-    throw new Error('baseImage must be data: URL');
-  }
-  const b64 = u.split(',')[1] || '';
-  return Buffer.from(b64, 'base64');
+// data:image/png;base64,...  →  { mimeType, buffer }
+function decodeDataUrl(dataUrl: string): { mimeType: string; buffer: Buffer } {
+  const m = /^data:(.+);base64,(.*)$/.exec(dataUrl);
+  if (!m) throw new Error('bad_data_url');
+  const mimeType = m[1] || 'image/png';
+  const buffer = Buffer.from(m[2], 'base64');
+  return { mimeType, buffer };
 }
 
-export default async function handler(
-  req: NextApiRequest,
-  res: NextApiResponse,
-) {
+export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   if (req.method !== 'POST') {
-    return res
-      .status(405)
-      .json({ ok: false, error: 'method_not_allowed' });
+    return res.status(405).json({ ok: false, error: 'method_not_allowed' });
   }
 
   try {
     const {
+      from,
       baseImage,
       overlaySVG,
       name,
@@ -42,64 +30,133 @@ export default async function handler(
       attributes,
       external_url,
     } = (req.body || {}) as {
+      from?: string;
       baseImage?: string;
       overlaySVG?: string;
       name?: string;
       description?: string;
-      attributes?: any;
+      attributes?: Array<{ trait_type: string; value: string | number }>;
       external_url?: string;
     };
 
     if (typeof baseImage !== 'string' || !baseImage.startsWith('data:')) {
-      return res
-        .status(400)
-        .json({ ok: false, error: 'bad_base_image' });
+      return res.status(400).json({ ok: false, error: 'missing_or_bad_base_image' });
     }
-    if (typeof overlaySVG !== 'string' || overlaySVG.trim() === '') {
-      return res
-        .status(400)
-        .json({ ok: false, error: 'bad_overlay_svg' });
+    if (typeof overlaySVG !== 'string' || !overlaySVG.trim()) {
+      return res.status(400).json({ ok: false, error: 'missing_overlay_svg' });
+    }
+    if (!PINATA_JWT) {
+      return res.status(500).json({ ok: false, error: 'missing_PINATA_JWT_env' });
     }
 
-    const baseBuf = dataUrlToBuffer(baseImage);
+    // ۱) decode base image
+    const { buffer: baseBuf } = decodeDataUrl(baseImage);
+
+    // ۲) ترکیب base + SVG overlay با sharp
     const svgBuf = Buffer.from(overlaySVG, 'utf8');
 
-    // compose (SVG روی PNG)
-    const png = await sharp(baseBuf)
-      .composite([{ input: svgBuf, gravity: 'centre' }])
-      .png({ compressionLevel: 9 })
+    const composedPng = await sharp(baseBuf)
+      .composite([{ input: svgBuf, top: 0, left: 0 }])
+      .png()
       .toBuffer();
 
-    // hash برای تطبیق هنگام مینت
-    const imageHash =
-      '0x' + crypto.createHash('sha256').update(png).digest('hex');
+    // ۳) keccak256 برای قفل‌کردن تصویر در قرارداد
+    const imageHash = keccak256(composedPng); // hex string مثل 0xabc...
 
-    // data URL برای پیش‌نمایش/دانلود
-    const dataURL = `data:image/png;base64,${png.toString('base64')}`;
+    // data URL برای پیش‌نمایش لوکال
+    const dataUrl = 'data:image/png;base64,' + composedPng.toString('base64');
 
-    // metadata به صورت data: (فعلاً بدون pin کردن)
-    const meta = {
-      name: name || 'MegaPersona Card',
-      description: description || '',
-      image: dataURL,
+    // ۴) آپلود تصویر روی Pinata → /pinning/pinFileToIPFS
+    const formData = new FormData();
+    const blob = new Blob([composedPng], { type: 'image/png' });
+    formData.append('file', blob, 'rankora-persona-card.png');
+
+    const pinataFileRes = await fetch('https://api.pinata.cloud/pinning/pinFileToIPFS', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${PINATA_JWT}`,
+      },
+      body: formData as any,
+    });
+
+    if (!pinataFileRes.ok) {
+      const txt = await pinataFileRes.text();
+      throw new Error(`pinFileToIPFS_failed_${pinataFileRes.status}: ${txt.slice(0, 200)}`);
+    }
+
+    const fileJson: any = await pinataFileRes.json();
+    const imageCid: string | undefined = fileJson?.IpfsHash;
+    if (!imageCid) {
+      throw new Error('pinFileToIPFS_missing_IpfsHash');
+    }
+
+    const ipfsImageUri = `ipfs://${imageCid}`;
+    const gatewayImageUrl = `${PINATA_GATEWAY}/${imageCid}`;
+
+    // ۵) ساخت متادیتا و آپلود آن روی Pinata → /pinning/pinJSONToIPFS
+    const metaName =
+      name || 'Base Persona Card';
+
+    const metaDesc =
+      description ||
+      'Base Persona Card generated by Rankora from public Base wallet activity. Soft 3D avatar + onchain stats overlay, no private keys, no extra permissions.';
+
+    const metadataObj = {
+      name: metaName,
+      description: metaDesc,
+      image: ipfsImageUri,
+      external_url: external_url || undefined,
       attributes: Array.isArray(attributes) ? attributes : [],
-      external_url: external_url || '',
+      // properties: { from }, // اگر لازم شد بعداً بازش کن
     };
-    const tokenUri =
-      'data:application/json;base64,' +
-      Buffer.from(JSON.stringify(meta)).toString('base64');
+
+    const pinataJsonRes = await fetch('https://api.pinata.cloud/pinning/pinJSONToIPFS', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${PINATA_JWT}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(metadataObj),
+    });
+
+    if (!pinataJsonRes.ok) {
+      const txt = await pinataJsonRes.text();
+      throw new Error(`pinJSONToIPFS_failed_${pinataJsonRes.status}: ${txt.slice(0, 200)}`);
+    }
+
+    const jsonResult: any = await pinataJsonRes.json();
+    const metaCid: string | undefined = jsonResult?.IpfsHash;
+    if (!metaCid) {
+      throw new Error('pinJSONToIPFS_missing_IpfsHash');
+    }
+
+    const tokenUri = `ipfs://${metaCid}`;
 
     return res.status(200).json({
       ok: true,
-      image: { gateway: dataURL }, // فعلاً همان dataURL برای UI
-      imageHash,
       tokenUri,
+      imageHash, // برای /api/sign-claim
+      image: {
+        ipfs: ipfsImageUri,
+        gateway: gatewayImageUrl,
+        dataUrl,
+      },
+      from: from || null,
     });
   } catch (e: any) {
     console.error('[api/compose-store] fatal:', e);
     return res.status(500).json({
       ok: false,
-      error: e?.message || 'compose_failed',
+      error: String(e?.message || e || 'compose_failed'),
     });
   }
 }
+
+// برای اینکه base64 تصویر رو قبول کنه
+export const config = {
+  api: {
+    bodyParser: {
+      sizeLimit: '10mb',
+    },
+  },
+};

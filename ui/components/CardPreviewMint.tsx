@@ -9,19 +9,29 @@ import { gateAbi } from '../lib/abi/gate';
 
 type Stat = { label: string; value: string };
 
+type ImageTraits = {
+  uniqueContracts: number;
+  activeDays: number;
+  gasPaidEth: number;
+  monthlyRank: number;
+  nftCount: number;
+  balanceEth: number;
+  txCount: number;
+};
+
 type Props = {
   // UI
   defaultPrompt: string;   // transparency only; server builds locked prompt
   title?: string;
   subtitle?: string;
   stats?: Stat[];
-  badgeText?: string;
+  badgeText?: string;      // فعلاً استفاده نمی‌کنیم (قبلاً ALL-TIME بود)
   placeholderSrc?: string;
   logoHref?: string;
 
   // Optional API inputs
   address?: string;        // falls back to connected wallet
-  traitsJson?: any;
+  traitsJson?: ImageTraits | null;  // فقط برای /api/generate
   persona?: any;
 };
 
@@ -94,72 +104,11 @@ function toNumberSafe(x: unknown, fallback = 0): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
-// ---------- Build SVG overlay (client-side); server composes it on base image ----------
-function buildOverlaySVG(
-  title: string | undefined,
-  addressStr: string | undefined,
-  stats: Stat[],
-  badgeText: string | undefined,
-  logoHref: string = '/base_logo.svg'
-): string {
-  const pad = 48;
-  const line = 44;
-  const max = Math.min(6, stats.length);
+// small math helpers
+const sum = (arr: number[]) => arr.reduce((a, b) => a + b, 0);
+const mean = (arr: number[]) => (arr.length ? sum(arr) / arr.length : 0);
 
-  const rows = Array.from({ length: max })
-    .map((_, i) => {
-      const y = 1024 - pad - 20 - (max - 1 - i) * line;
-      const s = stats[i];
-      return `
-        <text x="${pad}" y="${y}" style="font:500 28px Inter,Segoe UI,Arial; fill: rgba(255,255,255,.95)">
-          ${escapeXml(s.label)}:
-          <tspan style="font-weight:700">${escapeXml(s.value)}</tspan>
-        </text>`;
-    })
-    .join('\n');
-
-  const badge = badgeText
-    ? `
-    <rect x="806" y="32" rx="14" ry="14" width="170" height="44"
-      fill="rgba(255,215,0,0.12)" stroke="rgba(255,215,0,0.55)"/>
-    <text x="891" y="62" text-anchor="middle" style="font:700 22px Inter; fill: rgba(255,215,0,0.95)">
-      ${escapeXml(badgeText)}
-    </text>`
-    : '';
-
-  const titleEl = title
-    ? `<text x="${pad}" y="${pad + 10}" style="font:800 40px Inter,Segoe UI,Arial; fill:#fff">${escapeXml(title)}</text>`
-    : '';
-
-  const addrEl = addressStr
-    ? `<text x="${pad}" y="${pad + (title ? 52 : 50)}" style="font:600 26px Inter,Segoe UI,Arial; fill:rgba(255,255,255,.9)">${escapeAddress(addressStr)}</text>`
-    : '';
-
-  return `
-<svg viewBox="0 0 1024 1024" preserveAspectRatio="none" width="1024" height="1024" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <linearGradient id="topFade" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="rgba(0,0,0,.55)" />
-      <stop offset="60%" stop-color="rgba(0,0,0,0)" />
-    </linearGradient>
-    <linearGradient id="bottomFade" x1="0" y1="1" x2="0" y2="0">
-      <stop offset="0%" stop-color="rgba(0,0,0,.50)" />
-      <stop offset="55%" stop-color="rgba(0,0,0,0)" />
-    </linearGradient>
-  </defs>
-
-  <rect width="1024" height="430" fill="url(#topFade)" />
-  <rect y="594" width="1024" height="430" fill="url(#bottomFade)" />
-
-  <image href="${logoHref}" x="904" y="32" width="88" height="88" />
-
-  ${badge}
-  ${titleEl}
-  ${addrEl}
-  ${rows}
-</svg>`.trim();
-}
-
+// ---------- Build SVG overlay (server-side composition uses this) ----------
 function escapeXml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
@@ -167,29 +116,156 @@ function escapeAddress(s: string): string {
   return escapeXml(s);
 }
 
-// ---------- Live overlay for on-page preview ----------
+function buildOverlaySVG(
+  title: string | undefined,
+  addressStr: string | undefined,
+  statsIn: Stat[] | undefined,
+  logoHref: string = '/base_logo.svg', // فقط برای سازگاری امضاء
+): string {
+  const stats = Array.isArray(statsIn) ? statsIn : [];
+  const pad = 48;
+  const line = 46;
+  const max = Math.min(6, stats.length);
+
+  const rows = Array.from({ length: max })
+    .map((_, i) => {
+      const y = 1024 - pad - 20 - (max - 1 - i) * line;
+      const s = stats[i];
+      return `
+        <text
+          x="${pad}"
+          y="${y}"
+          fill="#e5efff"
+          stroke="#020617"
+          stroke-width="1.2"
+          paint-order="stroke fill"
+          style="font:600 28px Inter,Segoe UI,Arial;"
+        >
+          ${escapeXml(s.label)}:
+          <tspan
+            fill="#facc15"
+            stroke="#020617"
+            stroke-width="1.2"
+            paint-order="stroke fill"
+            style="font-weight:800;"
+          >
+            ${escapeXml(' ' + s.value)}
+          </tspan>
+        </text>`;
+    })
+    .join('\n');
+
+  const titleEl = title
+    ? `
+      <text
+        x="${pad}"
+        y="${pad + 14}"
+        fill="#ffffff"
+        stroke="#020617"
+        stroke-width="2"
+        paint-order="stroke fill"
+        style="font:800 42px Inter,Segoe UI,Arial;"
+      >
+        ${escapeXml(title)}
+      </text>`
+    : '';
+
+  const addrEl = addressStr
+    ? `
+      <text
+        x="${pad}"
+        y="${pad + (title ? 58 : 52)}"
+        fill="#e5efff"
+        stroke="#020617"
+        stroke-width="1.2"
+        paint-order="stroke fill"
+        style="font:600 28px Inter,Segoe UI,Arial;"
+      >
+        ${escapeAddress(addressStr)}
+      </text>`
+    : '';
+
+  return `
+<svg viewBox="0 0 1024 1024" preserveAspectRatio="none" width="1024" height="1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="topFade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#000000" stop-opacity="0.55" />
+      <stop offset="60%" stop-color="#000000" stop-opacity="0" />
+    </linearGradient>
+    <linearGradient id="bottomFade" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0%" stop-color="#000000" stop-opacity="0.50" />
+      <stop offset="55%" stop-color="#000000" stop-opacity="0" />
+    </linearGradient>
+  </defs>
+
+  <!-- top and bottom fades مثل قبل -->
+  <rect width="1024" height="430" fill="url(#topFade)" />
+  <rect y="594" width="1024" height="430" fill="url(#bottomFade)" />
+
+  <!-- Base logo بالا راست: فقط مربع آبی ساده -->
+  <rect
+    x="924"
+    y="32"
+    width="64"
+    height="64"
+    rx="16"
+    ry="16"
+    fill="#0052ff"
+  />
+
+  ${titleEl}
+  ${addrEl}
+  ${rows}
+</svg>`.trim();
+}
+
+// ---------- Live overlay (for on-page preview) ----------
 function LiveOverlay({
   title,
   addressStr,
-  stats,
-  badgeText,
+  stats = [],
+  badgeText,          // فعلاً استفاده نمی‌کنیم
   logoHref = '/base_logo.svg',
 }: {
   title?: string;
   addressStr?: string;
-  stats: Stat[];
+  stats?: Stat[];
   badgeText?: string;
   logoHref?: string;
 }) {
+  const safeStats = Array.isArray(stats) ? stats : [];
   const pad = 48;
-  const line = 44;
-  const n = Math.min(6, stats.length);
+  const line = 46;
+  const n = Math.min(6, safeStats.length);
+
   const rows = Array.from({ length: n }).map((_, i) => {
     const y = 1024 - pad - 20 - (n - 1 - i) * line;
-    const s = stats[i];
+    const s = safeStats[i];
     return (
-      <text key={i} x={pad} y={y} style={{ font: '500 28px Inter,Segoe UI,Arial', fill: 'rgba(255,255,255,.95)' }}>
-        {s.label}: <tspan style={{ fontWeight: 700 }}>{s.value}</tspan>
+      <text
+        key={i}
+        x={pad}
+        y={y}
+        fill="#e5efff"
+        stroke="#020617"
+        strokeWidth={1.2}
+        paintOrder="stroke fill"
+        style={{
+          fontFamily: 'Inter,Segoe UI,Arial',
+          fontSize: 28,
+          fontWeight: 600,
+        }}
+      >
+        {s.label}:
+        <tspan
+          fill="#facc15"
+          stroke="#020617"
+          strokeWidth={1.2}
+          paintOrder="stroke fill"
+          style={{ fontWeight: 800 }}
+        >
+          {' '}{s.value}
+        </tspan>
       </text>
     );
   });
@@ -198,40 +274,61 @@ function LiveOverlay({
     <svg viewBox="0 0 1024 1024" preserveAspectRatio="none" width="100%" height="100%">
       <defs>
         <linearGradient id="topFade" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="rgba(0,0,0,.55)" />
-          <stop offset="60%" stopColor="rgba(0,0,0,0)" />
+          <stop offset="0%" stopColor="#000000" stopOpacity={0.55} />
+          <stop offset="60%" stopColor="#000000" stopOpacity={0} />
         </linearGradient>
         <linearGradient id="bottomFade" x1="0" y1="1" x2="0" y2="0">
-          <stop offset="0%" stopColor="rgba(0,0,0,.50)" />
-          <stop offset="55%" stopColor="rgba(0,0,0,0)" />
+          <stop offset="0%" stopColor="#000000" stopOpacity={0.5} />
+          <stop offset="55%" stopColor="#000000" stopOpacity={0} />
         </linearGradient>
       </defs>
 
+      {/* top / bottom fades مثل حالت اولیه */}
       <rect width="1024" height="430" fill="url(#topFade)" />
-      <rect y="594" width="1024" height="430" fill="url(#bottomFade)" />
+      <rect y={594} width={1024} height={430} fill="url(#bottomFade)" />
 
-      {/* Base logo */}
-      <image href={logoHref} x="904" y="32" width="88" height="88" />
+      {/* مربع آبی Base بالا راست */}
+      <rect
+        x={924}
+        y={32}
+        width={64}
+        height={64}
+        rx={16}
+        ry={16}
+        fill="#0052ff"
+      />
 
-      {/* Badge */}
-      {badgeText && (
-        <>
-          <rect
-            x="806" y="32" rx="14" ry="14" width="170" height="44"
-            fill="rgba(255,215,0,0.12)" stroke="rgba(255,215,0,0.55)"
-          />
-          <text x="891" y="62" textAnchor="middle" style={{ font: '700 22px Inter', fill: 'rgba(255,215,0,0.95)' }}>
-            {badgeText}
-          </text>
-        </>
+      {title && (
+        <text
+          x={pad}
+          y={pad + 14}
+          fill="#ffffff"
+          stroke="#020617"
+          strokeWidth={2}
+          paintOrder="stroke fill"
+          style={{
+            fontFamily: 'Inter,Segoe UI,Arial',
+            fontSize: 42,
+            fontWeight: 800,
+          }}
+        >
+          {title}
+        </text>
       )}
 
-      {title && <text x={pad} y={pad + 10} style={{ font: '800 40px Inter,Segoe UI,Arial', fill: '#fff' }}>{title}</text>}
       {addressStr && (
         <text
           x={pad}
-          y={pad + (title ? 52 : 50)}
-          style={{ font: '600 26px Inter,Segoe UI,Arial', fill: 'rgba(255,255,255,.9)' }}
+          y={pad + (title ? 58 : 52)}
+          fill="#e5efff"
+          stroke="#020617"
+          strokeWidth={1.2}
+          paintOrder="stroke fill"
+          style={{
+            fontFamily: 'Inter,Segoe UI,Arial',
+            fontSize: 28,
+            fontWeight: 600,
+          }}
         >
           {addressStr}
         </text>
@@ -247,10 +344,9 @@ export default function CardPreviewMint({
   title = '',
   subtitle,
   stats = [],
-  badgeText = 'ALL-TIME',
-  placeholderSrc = '/persona_placeholder.png',
+  badgeText,
+  placeholderSrc = '/persona_placeholder.gif',
   logoHref = '/base_logo.svg',
-  // NEW props (optional)
   address: addressProp,
   traitsJson,
   persona,
@@ -259,6 +355,170 @@ export default function CardPreviewMint({
 
   const CONTRACT = process.env.NEXT_PUBLIC_CONTRACT as `0x${string}`;
   const GATE = (process.env.NEXT_PUBLIC_GATE || '') as `0x${string}` | '';
+
+  const effectiveAddress = addressProp || connected || '';
+
+  // ----- overlay stats from /api/metrics -----
+  const [metricsStats, setMetricsStats] = useState<Stat[] | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+
+    async function load() {
+      if (!effectiveAddress) {
+        if (alive) setMetricsStats(null);
+        return;
+      }
+      try {
+        const r = await fetch(`/api/metrics?address=${effectiveAddress}`, { cache: 'no-store' });
+        if (!r.ok) throw new Error(`metrics ${r.status}`);
+        const data: any = await r.json();
+
+        if (!alive || !data) return;
+
+        let overlay: Stat[] = [];
+
+        // ---- حالت ۱: ساختار /api/metrics → { summary, monthly } ----
+        const monthlyA: any[] =
+          Array.isArray(data.monthly) ? data.monthly :
+          Array.isArray(data.metrics?.monthly) ? data.metrics.monthly :
+          [];
+
+        if (monthlyA.length > 0) {
+          const sBal  = monthlyA.map(m => Number(m.avg_balance_eth ?? m.balance_eth ?? 0));
+          const sTxs  = monthlyA.map(m => Number(m.native_txs ?? m.txs ?? 0));
+          const sUniq = monthlyA.map(m => Number(m.uniq_contracts ?? m.uniq ?? 0));
+          const sDays = monthlyA.map(m => Number(m.uniq_days ?? m.days ?? 0));
+          const sRank = monthlyA.map(m => Number(m.ranks?.overall?.rank ?? m.rank_m ?? 0));
+
+          const activeMonths = monthlyA.filter(m =>
+            Number(m.native_txs ?? m.txs ?? 0) > 0 ||
+            Number(m.uniq_days ?? m.days ?? 0) > 0 ||
+            Number(m.uniq_contracts ?? m.uniq ?? 0) > 0,
+          ).length;
+
+          const V = {
+            balance: mean(sBal),
+            txs: sum(sTxs),
+            uniq: sum(sUniq),
+            days: sum(sDays),
+            months: activeMonths,
+            rank: (sRank.filter(x => x > 0).length ? Math.min(...sRank.filter(x => x > 0)) : 0),
+          };
+
+          overlay = [
+            {
+              label: 'Rank',
+              value: V.rank ? V.rank.toLocaleString() : '—',
+            },
+            {
+              label: 'Active Months',
+              value: String(V.months),
+            },
+            {
+              label: 'Active Days',
+              value: String(Math.round(V.days)),
+            },
+            {
+              label: 'Transactions',
+              value: String(Math.round(V.txs)),
+            },
+            {
+              label: 'Unique Contracts',
+              value: String(Math.round(V.uniq)),
+            },
+            {
+              label: 'Average Balance',
+              value: `${V.balance.toFixed(3)} ETH`,
+            },
+          ];
+        } else {
+          // ---- حالت ۲: ساختار wallets_FULL → { wallet, rank, lifetime, months:{...} } ----
+          const root: any = data.metrics || data;
+          const lifetime = root.lifetime || {};
+          const monthsObj = root.months || {};
+          const monthsArr = Object.values(monthsObj) as any[];
+
+          const rank =
+            root.rank ??
+            lifetime.rank ??
+            root.rank_lt ??
+            root.composite_rank_lt ??
+            0;
+
+          const txSum =
+            lifetime.tx_sum ??
+            monthsArr.reduce((acc, m) => acc + Number(m.txs || 0), 0);
+
+          const uniqSum =
+            lifetime.uniq_sum ??
+            monthsArr.reduce((acc, m) => acc + Number(m.uniq || 0), 0);
+
+          const daysSum =
+            monthsArr.reduce((acc, m) => acc + Number(m.days || 0), 0);
+
+          const activeMonths = monthsArr.filter(m =>
+            Number(m.txs || 0) > 0 ||
+            Number(m.days || 0) > 0 ||
+            Number(m.uniq || 0) > 0,
+          ).length;
+
+          const balanceMean =
+            lifetime.avg_balance_eth_mean ??
+            (monthsArr.length
+              ? monthsArr.reduce((acc, m) => acc + Number(m.bal || 0), 0) / monthsArr.length
+              : 0);
+
+          overlay = [
+            {
+              label: 'Rank',
+              value: rank ? Number(rank).toLocaleString() : '—',
+            },
+            {
+              label: 'Active Months',
+              value: String(activeMonths),
+            },
+            {
+              label: 'Active Days',
+              value: String(Math.round(daysSum)),
+            },
+            {
+              label: 'Transactions',
+              value: String(Math.round(txSum)),
+            },
+            {
+              label: 'Unique Contracts',
+              value: String(Math.round(uniqSum)),
+            },
+            {
+              label: 'Average Balance',
+              value: `${Number(balanceMean || 0).toFixed(3)} ETH`,
+            },
+          ];
+        }
+
+        if (process.env.NODE_ENV !== 'production') {
+          console.log('[/api/metrics raw]', data);
+          console.log('[CardPreviewMint overlay]', overlay);
+        }
+
+        if (alive) setMetricsStats(overlay);
+      } catch (e) {
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn('metrics overlay error', e);
+        }
+        if (alive) setMetricsStats(null);
+      }
+    }
+
+    load();
+    return () => { alive = false; };
+  }, [effectiveAddress]);
+
+  // اول متریک‌های خودمون، بعد اگر نبود، props.stats
+  const statsToUse: Stat[] =
+    (metricsStats && metricsStats.length > 0) ? metricsStats :
+    (stats && stats.length > 0 ? stats : []);
 
   // On-chain reads
   const { data: mintFeeWei } = useReadContract({
@@ -298,16 +558,15 @@ export default function CardPreviewMint({
 
   const { writeContractAsync } = useWriteContract();
 
-  const [baseImg, setBaseImg] = useState<string | null>(null);  // data URL from /api/generate
-  const [cardImg, setCardImg] = useState<string | null>(null);  // gateway/data URL after compose-store
-  const [cardHash, setCardHash] = useState<string | null>(null); // sha256 hex from server
-  const [tokenUri, setTokenUri] = useState<string | null>(null); // ipfs:// or data: metadata
+  const [baseImg, setBaseImg] = useState<string | null>(null);
+  const [cardImg, setCardImg] = useState<string | null>(null);
+  const [cardHash, setCardHash] = useState<string | null>(null);
+  const [tokenUri, setTokenUri] = useState<string | null>(null);
   const [busy, setBusy] = useState<{ gen?: boolean; compose?: boolean; mint?: boolean; paying?: boolean }>({});
   const [error, setError] = useState<string | null>(null);
   const [payTx, setPayTx] = useState<string | null>(null);
   const [mintTx, setMintTx] = useState<string | null>(null);
 
-  // Optional: USD price
   const [ethUsd, setEthUsd] = useState<number | null>(null);
   useEffect(() => {
     let alive = true;
@@ -322,7 +581,6 @@ export default function CardPreviewMint({
     return () => { alive = false; clearInterval(id); };
   }, []);
 
-  const effectiveAddress = addressProp || connected || '';
   const preview = cardImg || baseImg || placeholderSrc;
 
   const mintFeeEth = fmtEth(mintFeeWei);
@@ -331,7 +589,6 @@ export default function CardPreviewMint({
     ? Number(formatEther(toBigIntSafe(genFeeWei))) * ethUsd
     : null;
 
-  // Daily quota
   const cap = toNumberSafe(gateCap, 2);
   const rem = toNumberSafe(gateRemain, cap);
   const used = Math.max(0, cap - rem);
@@ -365,13 +622,11 @@ export default function CardPreviewMint({
       return;
     }
 
-    // Gate: enforce daily quota (if configured)
     if (GATE && gateRemain !== undefined && toNumberSafe(gateRemain) === 0) {
       setError('Daily generate limit reached. Try again tomorrow.');
       return;
     }
 
-    // Optional payment (Gate)
     let payHash: string | null = null;
     if (GATE && genFeeWei != null) {
       setBusy(b => ({ ...b, paying: true }));
@@ -393,7 +648,6 @@ export default function CardPreviewMint({
       setBusy(b => ({ ...b, paying: false }));
     }
 
-    // Call our image API
     setBusy(b => ({ ...b, gen: true }));
     try {
       const r = await fetch('/api/generate', {
@@ -421,17 +675,31 @@ export default function CardPreviewMint({
     }
   }
 
-  // --- Compose → Store (IPFS/data:) ---
-  async function composeCard() {
-    if (!baseImg || !effectiveAddress) { setError('Generate first (and connect wallet).'); return; }
-    setBusy(b => ({ ...b, compose: true })); setError(null);
+  // --- Compose + Mint در یک کلیک ---
+  async function handleComposeAndMint() {
+    setError(null);
+
+    if (!effectiveAddress) {
+      setError('Connect wallet first.');
+      return;
+    }
+    if (!baseImg) {
+      setError('Generate persona first.');
+      return;
+    }
+
+    // 1) Compose / store
+    setBusy(b => ({ ...b, compose: true }));
+    let composedImg: string | null = null;
+    let composedHash: string | null = null;
+    let composedTokenUri: string | null = null;
+
     try {
       const svg = buildOverlaySVG(
         title,
         subtitle || (effectiveAddress ? `${effectiveAddress.slice(0,6)}…${effectiveAddress.slice(-4)}` : ''),
-        stats,
-        badgeText,
-        logoHref
+        statsToUse,
+        logoHref,
       );
 
       const r = await fetch('/api/compose-store', {
@@ -439,68 +707,75 @@ export default function CardPreviewMint({
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           from: effectiveAddress,
-          baseImage: baseImg,   // data:/http(s)/ipfs://
-          overlaySVG: svg,      // SVG string
-          name: 'MegaPersona Card',
-          description: 'Deterministic persona generated from on-chain activity.',
-          attributes: stats.map(s => ({ trait_type: s.label, value: s.value })),
+          baseImage: baseImg,
+          overlaySVG: svg,
+          name: 'Base Persona Card',
+          description: 'Deterministic persona generated from onchain activity.',
+          attributes: (statsToUse || []).map(s => ({ trait_type: s.label, value: s.value })),
           external_url: window.location.origin + `/nft/${effectiveAddress}`,
         }),
       });
       const j = await parseJsonOrText(r);
       if (!j?.ok) throw new Error(j?.error || 'compose_failed');
 
-      // server returns { image: { gateway }, tokenUri, imageHash }
-      setCardImg(j.image?.gateway || null);
-      setCardHash(j.imageHash || null);
-      setTokenUri(j.tokenUri || null);
+      composedImg = j.image?.gateway || null;
+      composedHash = j.imageHash || null;
+      composedTokenUri = j.tokenUri || null;
+
+      setCardImg(composedImg);
+      setCardHash(composedHash);
+      setTokenUri(composedTokenUri);
       setMintTx(null);
     } catch (e: any) {
-      setError(String(e?.message || e));
-    } finally {
       setBusy(b => ({ ...b, compose: false }));
+      setError(String(e?.message || e));
+      return;
     }
-  }
+    setBusy(b => ({ ...b, compose: false }));
 
-  // --- Sign → Claim ---
-  async function uploadSignMint() {
-    if (!cardImg || !tokenUri) { setError('Compose card first.'); return; }
-    if (!effectiveAddress) { setError('Connect wallet first.'); return; }
+    // 2) Mint
+    if (!composedImg || !composedTokenUri) {
+      setError('Missing composed image or tokenURI');
+      return;
+    }
 
-    setBusy(b => ({ ...b, mint: true })); setError(null);
+    setBusy(b => ({ ...b, mint: true }));
     try {
-      // 1) deadline + nonce
-      const deadline = Math.floor(Date.now()/1000) + 3600;
+      const deadline = Math.floor(Date.now() / 1000) + 3600;
       const nonce = Number(nextNonce || 0);
 
-      // imageHash from compose-store; fallback to keccak(dataURL)
-      let imageHash = cardHash;
-      if (!imageHash && cardImg.startsWith('data:')) {
-        imageHash = keccak256(dataUrlBytes(cardImg));
+      let imageHash = composedHash;
+      if (!imageHash && composedImg.startsWith('data:')) {
+        imageHash = keccak256(dataUrlBytes(composedImg));
       }
       if (!imageHash) throw new Error('missing image hash');
 
-      // 2) signature (server-side)
       const sc = await fetch('/api/sign-claim', {
-        method:'POST', headers:{'content-type':'application/json'},
-        body: JSON.stringify({ to: effectiveAddress, tokenURI: tokenUri, imageHash, deadline, nonce })
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ to: effectiveAddress, tokenURI: composedTokenUri, imageHash, deadline, nonce }),
       }).then(parseJsonOrText);
       if (!sc?.sig) throw new Error(sc?.error || 'sign_claim_failed');
 
-      // 3) payable value
       const value = toBigIntSafe(mintFeeWei);
+      const args = [
+        { to: effectiveAddress, tokenURI: composedTokenUri, imageHash, deadline, nonce },
+        sc.sig,
+      ] as any;
 
-      // 4) claim
-      const args = [ { to: effectiveAddress, tokenURI: tokenUri, imageHash, deadline, nonce }, sc.sig ] as any;
       const txHash = await writeContractAsync({
-        address: CONTRACT, abi: bmImage721Abi as any, functionName: 'claim', args, value
+        address: CONTRACT,
+        abi: bmImage721Abi as any,
+        functionName: 'claim',
+        args,
+        value,
       });
       setMintTx(String(txHash));
       if (typeof window !== 'undefined') window.alert('Mint tx sent: ' + txHash);
-    } catch(e:any) {
+    } catch (e: any) {
       setError(String(e?.message || e));
     } finally {
-      setBusy(b=>({ ...b, mint:false }));
+      setBusy(b => ({ ...b, mint: false }));
     }
   }
 
@@ -532,7 +807,7 @@ export default function CardPreviewMint({
   return (
     <div className="grid gap-3">
       {/* Buttons */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(3, minmax(0, 1fr))', gap: 10, alignItems:'center' }}>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(2, minmax(0, 1fr))', gap: 10, alignItems:'center' }}>
         <button
           onClick={handleGenerate}
           disabled={!!busy.gen || !!busy.paying || (!!GATE && gateRemain!==undefined && toNumberSafe(gateRemain)===0)}
@@ -542,20 +817,12 @@ export default function CardPreviewMint({
           {busy.paying ? 'Paying…' : 'Generate'}
         </button>
         <button
-          onClick={composeCard}
-          disabled={!baseImg || !!busy.compose}
-          style={{ ...btn('linear-gradient(135deg,#0ea5e9,#6366f1)'), ...(!baseImg||busy.compose?btnDisabled:{}) }}
-          title="Compose"
+          onClick={handleComposeAndMint}
+          disabled={!baseImg || !!busy.compose || !!busy.mint}
+          style={{ ...btn('linear-gradient(135deg,#10b981,#059669)'), ...(!baseImg||busy.compose||busy.mint?btnDisabled:{}) }}
+          title="Compose & Mint"
         >
-          Compose
-        </button>
-        <button
-          onClick={uploadSignMint}
-          disabled={!cardImg || !!busy.mint}
-          style={{ ...btn('linear-gradient(135deg,#10b981,#059669)'), ...(!cardImg||busy.mint?btnDisabled:{}) }}
-          title="Mint"
-        >
-          Mint
+          {busy.compose || busy.mint ? 'Processing…' : 'Mint'}
         </button>
       </div>
 
@@ -589,7 +856,7 @@ export default function CardPreviewMint({
             <LiveOverlay
               title={title}
               addressStr={subtitle || (effectiveAddress ? `${effectiveAddress.slice(0,6)}…${effectiveAddress.slice(-4)}` : '')}
-              stats={stats}
+              stats={statsToUse}
               badgeText={badgeText}
               logoHref={logoHref}
             />

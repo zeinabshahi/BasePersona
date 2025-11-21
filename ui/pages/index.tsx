@@ -79,7 +79,7 @@ function buildRandomMetrics(addr: string): WalletStatRecord {
   }
 }
 
-/** species → short visual cue (no need for SPECIES map) */
+/** species → short visual cue */
 function speciesCueFor(s?: SpeciesId) {
   switch (s) {
     case 'fox': return 'Base-blue cyber fox character';
@@ -90,7 +90,7 @@ function speciesCueFor(s?: SpeciesId) {
   }
 }
 
-/** Locked image prompt built from traits locks (قدیمی؛ فقط برای UI به‌عنوان fallback) */
+/** Locked image prompt (فقط fallback UI) */
 function buildLockedPrompt(traitsResp: any): string {
   const t = traitsResp?.traitsJson || traitsResp || {};
   const species: SpeciesId | undefined = t?.species;
@@ -102,19 +102,19 @@ function buildLockedPrompt(traitsResp: any): string {
     : 'deep electric blue gradient';
 
   const bits = [
-    speciesCue,                // the only semantic variable
-    'waist-up portrait',       // camera lock
-    'stylized 3D render',      // style lock
+    speciesCue,
+    'waist-up portrait',
+    'stylized 3D render',
     lock?.lighting || 'cinematic studio lighting',
-    'ultra detailed',          // quality lock
-    `background: ${bg}`,       // bg lock
-    'symmetrical composition', // composition lock
-    '1:1 aspect ratio',        // aspect lock
+    'ultra detailed',
+    `background: ${bg}`,
+    'symmetrical composition',
+    '1:1 aspect ratio',
   ];
   return bits.join(', ');
 }
 
-/** Persona/narrative normalizer for PersonaText */
+/** Persona/narrative normalizer */
 type PersonaCopy = {
   title: string; oneLiner: string; summary: string; highlights: string[]; personalityTags: string[];
 };
@@ -130,7 +130,7 @@ function coerceCopy(x: any | null | undefined): PersonaCopy | null {
   return { title, oneLiner, summary, highlights, personalityTags };
 }
 
-/** Seeded demo narrative (so Persona panel is never empty) */
+/** Seeded demo narrative (fallback) */
 function seededRng(addr?: string) {
   let t = parseInt((addr?.slice(-8) || 'deadbeef'), 16) >>> 0;
   return () => {
@@ -247,27 +247,23 @@ export default function Page() {
           ...(gRank ? { globalRank: gRank } : {}),
         };
 
-        // --- FIXED: monthlyRank بدون قاطی شدن ?? با || ---
+        // monthlyRank فقط برای image traits؛ برای نمایش از globalRank استفاده می‌کنیم
         const rawMonthlyRank =
           m?.ranks?.overall?.rank ??
           m?.ranks?.activity?.rank ??
           (gRank && gRank > 0 ? gRank : undefined);
 
-        const monthlyRank = Number(
-          rawMonthlyRank ?? 500000
-        );
+        const monthlyRank = Number(rawMonthlyRank ?? 500000);
 
         // traitsJson برای /api/generate (RawTraits)
         imageTraitsNext = {
-          uniqueContracts: Number(m?.uniq_contracts ?? 0),
-          activeDays: Number(m?.active_days ?? 0),
+          uniqueContracts: stats.uniqueContractInteractions ?? 0,
+          activeDays: stats.uniqueDays ?? 0,
           gasPaidEth: Number(m?.gas_spent_eth ?? 0),
           monthlyRank,
-          nftCount: Number(m?.nft_mints ?? m?.nft_contracts ?? 0),
-          balanceEth: Number(m?.avg_balance_eth ?? 0),
-          txCount:
-            Number(m?.tx_count_native ?? m?.tx_count ?? 0) +
-            Number(m?.tx_count_token ?? 0),
+          nftCount: stats.uniqueNftContractCount ?? 0,
+          balanceEth: stats.balanceETH ?? 0,
+          txCount: (stats.nativeTxCount ?? 0) + (stats.tokenTxCount ?? 0),
         };
       } catch {
         // fallback: رندوم
@@ -320,13 +316,13 @@ export default function Page() {
       // 3) traits (species & hard style locks for image)
       const nowUnix = Math.floor(Date.now()/1000);
       const metricsTraits = {
-        txCount: metricsPersona.total_txs,
-        volumeETH: metricsPersona.volume_eth,
         uniqueContracts: metricsPersona.unique_contracts,
         activeDays: metricsPersona.active_days,
-        dexTrades: metricsPersona.dex_trades,
-        nftMints: metricsPersona.nft_contracts,
-        firstSeenBlock: 0,
+        gasEth: metricsPersona.gas_eth,
+        monthlyRank: metricsPersona.global_rank ?? 9_999_999,
+        nftCount: metricsPersona.nft_contracts,
+        balanceEth: metricsPersona.volume_eth,
+        totalTxs: metricsPersona.total_txs,
       };
       let traitsResp: any = null;
       try {
@@ -345,7 +341,7 @@ export default function Page() {
       } catch { traitsResp = null; }
       setTraits(traitsResp);
 
-      // 4) narrative (long, human, Base-flavored; no visual words)
+      // 4) narrative
       let narrativeResp: any = null;
       try {
         const r = await fetch('/api/narrative', {
@@ -362,26 +358,27 @@ export default function Page() {
     }
   }
 
-  // Stats for the right-hand card
+  // ❌ دیگه آنالیز خودکار روی کانکت شدن نداریم (برای صرفه‌جویی در هزینه)
+
+  // Stats base object
   const statsToShow = useMemo(
     () => walletStats ?? {
       address: address || '—',
       baseBuilderHolder: false, baseIntroducedHolder: false,
-      balanceETH: 0.111, volumeETH: 0.222,
-      nativeTxCount: 3, tokenTxCount: 2,
-      totalContractInteractions: 7, uniqueContractInteractions: 2,
-      walletAgeDays: 12, uniqueDays: 4, uniqueWeeks: 1, uniqueMonths: 1, uniqueNftContractCount: 1,
+      balanceETH: 0, volumeETH: 0,
+      nativeTxCount: 0, tokenTxCount: 0,
+      totalContractInteractions: 0, uniqueContractInteractions: 0,
+      walletAgeDays: 0, uniqueDays: 0, uniqueWeeks: 0, uniqueMonths: 0, uniqueNftContractCount: 0,
     } as WalletStatRecord,
     [walletStats, address]
   );
 
-  // آدرس مؤثر برای کارت و زیرنویس (یا کانکت‌شده، یا تایپ‌شده)
   const effectivePersonaAddress = useMemo(
     () => (isConnected && connectedAddress) ? connectedAddress : address,
     [isConnected, connectedAddress, address]
   );
 
-  // Persona text: narrative → persona → seeded demo (never empty)
+  // Persona text
   const personaCopy = useMemo(() => {
     const seeded = demoPersona(
       effectivePersonaAddress,
@@ -390,7 +387,7 @@ export default function Page() {
     return coerceCopy(narrative) || coerceCopy(persona) || seeded;
   }, [narrative, persona, traits, effectivePersonaAddress]);
 
-  // Locked prompt for image generation (فقط برای UI؛ /api/generate خودش پرامپت قفل‌شده می‌سازد)
+  // Locked prompt
   const promptForImage = useMemo(() => {
     try {
       const p = buildLockedPrompt(traits);
@@ -398,16 +395,28 @@ export default function Page() {
     } catch { return DEFAULT_PROMPT }
   }, [traits]);
 
-  const anyStats = statsToShow as any;
-  const rankStr = typeof anyStats?.globalRank === 'number' ? `#${anyStats.globalRank}` : '—';
-  const statsForCard = [
-    { label: 'Rank',             value: rankStr },
-    { label: 'Age',              value: `${statsToShow.walletAgeDays ?? 0} days` },
-    { label: 'Active Days',      value: String(statsToShow.uniqueDays ?? 0) },
-    { label: 'Interactions',     value: String(statsToShow.totalContractInteractions ?? 0) },
-    { label: 'Unique Contracts', value: String(statsToShow.uniqueContractInteractions ?? 0) },
-    { label: 'Volume',           value: `${(statsToShow.volumeETH ?? 0).toFixed(2)} ETH` },
-  ];
+  // ✨ خلاصه‌ی کارت: فقط و فقط از walletStats (همون /api/metrics)
+  const statsForCard = useMemo(() => {
+    const anyStats = statsToShow as any;
+    const rankVal =
+      typeof anyStats.globalRank === 'number' && anyStats.globalRank > 0
+        ? anyStats.globalRank
+        : 0;
+    const rankStr = rankVal ? `#${rankVal.toLocaleString()}` : '—';
+
+    const activeDays = statsToShow.uniqueDays ?? 0;
+    const tx = (statsToShow.nativeTxCount ?? 0) + (statsToShow.tokenTxCount ?? 0);
+    const uniqContracts = statsToShow.uniqueContractInteractions ?? 0;
+    const balance = statsToShow.balanceETH ?? 0;
+
+    return [
+      { label: 'Rank',             value: rankStr },
+      { label: 'Active Days',      value: String(activeDays) },
+      { label: 'Tx',               value: String(tx) },
+      { label: 'Unique Contracts', value: String(uniqContracts) },
+      { label: 'Balance',          value: `${balance.toFixed(2)} ETH` },
+    ];
+  }, [statsToShow]);
 
   const subtitleAddr = effectivePersonaAddress
     ? `${effectivePersonaAddress.slice(0, 6)}…${effectivePersonaAddress.slice(-4)}`
@@ -441,7 +450,7 @@ export default function Page() {
                     letterSpacing: '0.3px',
                   }}
                 />
-                {/* Month dropdown (for charts only; persona is lifetime) */}
+                {/* Month dropdown (charts only) */}
                 <div className={styles.selectShell}>
                   <select
                     className={styles.selectMonth}
