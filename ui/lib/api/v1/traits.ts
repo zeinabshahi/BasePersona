@@ -1,13 +1,24 @@
-import type { NextApiRequest, NextApiResponse } from 'next'
-import { pickTraits } from '../../../lib/traits'
-import { buildPrompt } from '../../../lib/prompt'
-import { canonicalJson, toKeccakHex } from '../../../lib/utils'
+// lib/api/v1/traits.ts
+import type { NextApiRequest, NextApiResponse } from 'next';
+import { pickTraits } from '../../../lib/traits';
+import { buildPrompt } from '../../../lib/prompt';
+import { canonicalJson, toKeccakHex } from '../../../lib/utils';
 
 export default function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'POST') return res.status(405).json({ ok:false, error:'method_not_allowed' })
+  if (req.method !== 'POST') {
+    return res.status(405).json({ ok: false, error: 'method_not_allowed' });
+  }
+
   try {
-    const { address, metrics = {}, modelVersion = 1 } = req.body || {}
-    if (!address) return res.status(400).json({ ok:false, error:'missing_address' })
+    const { address, metrics = {}, modelVersion = 1 } = (req.body || {}) as {
+      address?: string;
+      metrics?: any;
+      modelVersion?: number;
+    };
+
+    if (!address) {
+      return res.status(400).json({ ok: false, error: 'missing_address' });
+    }
 
     const w = {
       address: String(address),
@@ -20,13 +31,24 @@ export default function handler(req: NextApiRequest, res: NextApiResponse) {
       dex_trades: Number(metrics.dex_trades ?? 0),
       nft_mints: Number(metrics.nft_mints ?? 0),
       holds_builder: !!metrics.baseBuilderHolder,
-      holds_introduced: !!metrics.baseIntroducedHolder
-    }
-    const { traits, names } = pickTraits(w as any)
-    const prompt = buildPrompt(traits)
-    const promptHash = toKeccakHex(canonicalJson({ names, prompt, modelVersion }))
-    res.status(200).json({ ok:true, names, prompt, promptHash })
-  } catch (e:any) {
-    res.status(500).json({ ok:false, error:e?.message || 'traits_failed' })
+      holds_introduced: !!metrics.baseIntroducedHolder,
+    };
+
+    // نسخه‌ی جدید: pickTraits یک BuiltTraits برمی‌گردونه
+    const built = pickTraits(w as any, {} as any);
+    const names = built.names;
+    const prompt = buildPrompt(built);
+
+    const promptHash = toKeccakHex(
+      canonicalJson({ names, prompt, modelVersion }),
+    );
+
+    return res
+      .status(200)
+      .json({ ok: true, names, prompt, promptHash });
+  } catch (e: any) {
+    return res
+      .status(500)
+      .json({ ok: false, error: e?.message || 'traits_failed' });
   }
 }
