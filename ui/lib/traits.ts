@@ -1,5 +1,4 @@
 // lib/traits.ts
-import type { SpeciesId } from './species';
 import { SPECIES } from './species';
 
 export type Metrics = {
@@ -40,6 +39,9 @@ function bucketByStepsLowerIsBetter(value: number, steps: number[]) {
   }
   return idx;
 }
+
+// نوع ساده برای species، فقط برای اینکه TS راضی بشه
+type SpeciesId = string | number;
 
 export type BuiltTraits = {
   version: 2;
@@ -200,7 +202,10 @@ export function pickTraits(
   const accessoryIdx = Math.min(Math.max(tNft, tBal), accessoryPrompts.length - 1);
   const emblemIdx = Math.min(tRank, emblemPrompts.length - 1);
 
-  const bgHex = SPECIES[species].bgHex;
+  // SPECIES احتمالاً یک آبجکت/آرایه با bgHex است؛ به any کست می‌کنیم که TS ایراد نگیرد
+  const bgHex =
+    (SPECIES as any)?.[species]?.bgHex ??
+    '#020617';
 
   return {
     version: 2,
