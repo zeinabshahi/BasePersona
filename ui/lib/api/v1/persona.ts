@@ -6,7 +6,12 @@ import { buildPrompt } from '../../../lib/prompt';
 import { renderImage } from '../../../lib/ai/image';
 import { generateNarrative } from '../../../lib/ai/llm';
 import { canonicalJson, toKeccakHex } from '../../../lib/utils';
-import { rateLimit, requireApiKey, send401, send429 } from '../../../lib/api/auth';
+import {
+  rateLimit,
+  requireApiKey,
+  send401,
+  send429,
+} from '../../../lib/api/auth';
 
 type Metrics = {
   wallet_birth_month?: number;
@@ -21,9 +26,14 @@ type Metrics = {
   baseIntroducedHolder?: boolean;
 };
 
-export default async function handler(req: NextApiRequest, res: NextApiResponse) {
+export default async function handler(
+  req: NextApiRequest,
+  res: NextApiResponse,
+) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ ok: false, error: 'method_not_allowed' });
+    return res
+      .status(405)
+      .json({ ok: false, error: 'method_not_allowed' });
   }
   if (!rateLimit(req, 40, 60_000)) return send429(res);
 
@@ -34,39 +44,47 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       persona = {},
       timeAnchor = { nowUnix: Math.floor(Date.now() / 1000) },
       modelVersion = 1,
-      dryRun = false,               // اگر true باشد، تصویر تولید نمی‌شود
-      imgProvider,                  // override اختیاری provider تصویر
-      llmProvider,                  // override اختیاری provider متن
-    } = req.body || {};
+      dryRun = false, // اگر true باشد، تصویر تولید نمی‌شود
+      imgProvider, // override اختیاری provider تصویر
+      llmProvider, // override اختیاری provider متن
+    } = (req.body || {}) as {
+      address?: string;
+      metrics?: Metrics;
+      persona?: any;
+      timeAnchor?: any;
+      modelVersion?: number;
+      dryRun?: boolean;
+      imgProvider?: string;
+      llmProvider?: string;
+    };
 
     if (!address) {
-      return res.status(400).json({ ok: false, error: 'missing_address' });
+      return res
+        .status(400)
+        .json({ ok: false, error: 'missing_address' });
     }
 
     // امنیت: اگر INTERNAL_API_KEY تنظیم شده، برای تصویر لازم است
     if (!dryRun && !requireApiKey(req)) return send401(res);
 
-    // 1) traits + prompt
-    const w = {
-      address: String(address),
-      wallet_birth_month: Number(metrics?.wallet_birth_month) || undefined,
-      wallet_age_days: Number(metrics?.wallet_age_days) || undefined,
-      unique_contracts: Number(metrics?.unique_contracts ?? 0),
-      active_days: Number(metrics?.active_days ?? 0),
-      total_txs: Number(metrics?.total_txs ?? 0),
-      distinct_tokens: Number(metrics?.distinct_tokens ?? 0),
-      dex_trades: Number(metrics?.dex_trades ?? 0),
-      nft_mints: Number(metrics?.nft_mints ?? 0),
-      holds_builder: !!metrics?.baseBuilderHolder,
-      holds_introduced: !!metrics?.baseIntroducedHolder,
+    // 1) traits + prompt (برای سازگاری با نسخه‌ی جدید pickTraits)
+    const traitMetrics = {
+      uniqueContracts: Number(metrics?.unique_contracts ?? 0),
+      activeDays: Number(metrics?.active_days ?? 0),
+      gasEth: 0, // در این مسیر v1 چیزی برای گس نداریم، فعلاً ۰ می‌گذاریم
+      monthlyRank: 500000, // پیش‌فرض محافظه‌کارانه
+      nftCount: Number(metrics?.nft_mints ?? 0),
+      balanceEth: 0,
+      totalTxs: Number(metrics?.total_txs ?? 0),
     };
 
-    // نسخه‌ی جدید: pickTraits دو آرگومان می‌خواهد
-    const built = pickTraits(w as any, {} as any);
+    const built = pickTraits(traitMetrics);
     const names = built.names;
     const prompt = buildPrompt(built);
 
-    const promptHash = toKeccakHex(canonicalJson({ names, prompt, modelVersion }));
+    const promptHash = toKeccakHex(
+      canonicalJson({ names, prompt, modelVersion }),
+    );
     const seedInput = canonicalJson({ address, modelVersion });
 
     // 2) narrative
@@ -74,7 +92,10 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       persona: {
         address,
         ...persona,
-        llmProvider: llmProvider || process.env.LLM_PROVIDER || 'openai',
+        llmProvider:
+          llmProvider ||
+          process.env.LLM_PROVIDER ||
+          'openai',
       },
       traits: { names },
       analytics: metrics || {},
@@ -108,7 +129,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
     const id = Date.now().toString(36);
 
-    res.status(200).json({
+    return res.status(200).json({
       ok: true,
       id,
       address,
@@ -117,10 +138,12 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
       prompt,
       promptHash,
       narrative: narrativeJson,
-      imageURL,      // در dryRun: undefined
-      imageSHA256,   // در dryRun: undefined
+      imageURL, // در dryRun: undefined
+      imageSHA256, // در dryRun: undefined
     });
   } catch (e: any) {
-    res.status(500).json({ ok: false, error: e?.message || 'persona_failed' });
+    return res
+      .status(500)
+      .json({ ok: false, error: e?.message || 'persona_failed' });
   }
 }
