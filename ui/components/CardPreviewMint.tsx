@@ -132,45 +132,52 @@ function buildOverlaySVG(
       value: (s?.value ?? '').toString(),
     }));
 
-  const padX = 80;
-  const padBottom = 80;
-  const rowHeight = 60;
+  const padX = 120;
+  const padBottom = 90;
+  const rowHeight = 64;
+
+  const rowsCount = safeStats.length || 1;
+  const firstBase = 1024 - padBottom - (rowsCount - 1) * rowHeight;
+  const yTopRect = firstBase - 46;
+  const yBottomRect = 1024 - padBottom - 46 + 56;
+  const lineX = padX - 40;
+  const lineY1 = yTopRect - 24;
+  const lineY2 = yBottomRect + 18;
 
   const rows = safeStats
     .map((row, i) => {
-      const rowsCount = safeStats.length || 1;
       const yBase = 1024 - padBottom - (rowsCount - 1 - i) * rowHeight;
-
-      const rectY = yBase - 42;
+      const rectY = yBase - 46;
       const labelY = yBase - 18;
-      const valueY = yBase + 8;
+      const valueY = yBase + 10;
 
-      const label = escapeXml(row.label.toUpperCase());
-      const value = escapeXml(row.value);
+      const rawLabel = (row.label || '').toString();
+      const label = escapeXml(rawLabel.toUpperCase());
+      const value = escapeXml(row.value || '');
 
       return `
       <g>
         <!-- پس‌زمینه نیمه‌شفاف هر ردیف -->
-        <rect x="${padX - 12}" y="${rectY}" width="440" height="52" rx="20" ry="20"
-              fill="#020617" fill-opacity="0.80" />
-        <!-- نوار آبی کناری -->
-        <rect x="${padX - 12}" y="${rectY}" width="6" height="52" rx="3" ry="3"
+        <rect x="${padX - 8}" y="${rectY}" width="520" height="56" rx="18" ry="18"
+              fill="#020617" fill-opacity="0.82" />
+        <!-- نوار آبی کوچک کنار متن -->
+        <rect x="${padX - 8}" y="${rectY}" width="6" height="56" rx="3" ry="3"
               fill="#38BDF8" />
 
         <!-- لیبل -->
-        <text x="${padX + 16}" y="${labelY}"
+        <text x="${padX + 20}" y="${labelY}"
               fill="#9CA3AF"
-              font-size="18"
+              font-size="17"
               font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"
-              letter-spacing="0.16em">
+              letter-spacing="0.18em">
           ${label}
         </text>
 
         <!-- مقدار -->
-        <text x="${padX + 16}" y="${valueY}"
-              fill="#F9FAFB"
+        <text x="${padX + 20}" y="${valueY}"
+              fill="#FACC15"
               font-size="26"
-              font-weight="600"
+              font-weight="700"
               font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
           ${value}
         </text>
@@ -184,10 +191,10 @@ function buildOverlaySVG(
   const titleBlock = titleSafe
     ? `
     <g>
-      <text x="96" y="140"
+      <text x="120" y="140"
             fill="#F9FAFB"
             font-size="40"
-            font-weight="700"
+            font-weight="800"
             font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
         ${titleSafe}
       </text>
@@ -196,11 +203,11 @@ function buildOverlaySVG(
 
   const addrBlock = addrSafe
     ? `
-    <g opacity="0.9">
-      <rect x="96" y="154" rx="999" ry="999" width="260" height="40"
-            fill="#020617" fill-opacity="0.7" />
-      <text x="116" y="181"
-            fill="#9CA3AF"
+    <g opacity="0.95">
+      <rect x="120" y="154" rx="999" ry="999" width="280" height="40"
+            fill="#020617" fill-opacity="0.75" />
+      <text x="142" y="181"
+            fill="#E5E7EB"
             font-size="20"
             font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
         ${addrSafe}
@@ -216,12 +223,18 @@ function buildOverlaySVG(
      xmlns="http://www.w3.org/2000/svg">
   <defs>
     <linearGradient id="topFade" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%"  stop-color="#000000" stop-opacity="0.55" />
-      <stop offset="60%" stop-color="#000000" stop-opacity="0" />
+      <stop offset="0%"  stop-color="#000000" stop-opacity="0.58" />
+      <stop offset="65%" stop-color="#000000" stop-opacity="0" />
     </linearGradient>
     <linearGradient id="bottomFade" x1="0" y1="1" x2="0" y2="0">
-      <stop offset="0%"  stop-color="#000000" stop-opacity="0.50" />
+      <stop offset="0%"  stop-color="#000000" stop-opacity="0.52" />
       <stop offset="55%" stop-color="#000000" stop-opacity="0" />
+    </linearGradient>
+    <linearGradient id="leftRail" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%"  stop-color="#38BDF8" stop-opacity="0.0" />
+      <stop offset="18%" stop-color="#38BDF8" stop-opacity="0.9" />
+      <stop offset="82%" stop-color="#38BDF8" stop-opacity="0.9" />
+      <stop offset="100%" stop-color="#38BDF8" stop-opacity="0.0" />
     </linearGradient>
   </defs>
 
@@ -229,7 +242,13 @@ function buildOverlaySVG(
   <rect x="0" y="0"    width="1024" height="260" fill="url(#topFade)" />
   <rect x="0" y="764"  width="1024" height="260" fill="url(#bottomFade)" />
 
-  <!-- لوگوی مربع پایینی (گوشه بالا راست کارت) -->
+  <!-- ریل عمودی سمت چپ (حس HUD / گیمی) -->
+  <rect x="${lineX - 2}" y="${lineY1}" width="4" height="${lineY2 - lineY1}"
+        fill="#020617" fill-opacity="0.9" />
+  <rect x="${lineX}" y="${lineY1}" width="2" height="${lineY2 - lineY1}"
+        fill="url(#leftRail)" />
+
+  <!-- لوگوی مربع بالا راست کارت -->
   <rect x="872" y="104" width="40" height="40" rx="12" ry="12"
         fill="#0EA5E9" />
   <rect x="882" y="114" width="20" height="20" rx="5" ry="5"
@@ -259,39 +278,80 @@ function LiveOverlay({
   logoHref?: string;
 }) {
   const safeStats = Array.isArray(stats) ? stats : [];
-  const pad = 48;
-  const line = 46;
-  const n = Math.min(6, safeStats.length);
+  const padX = 120;
+  const padBottom = 90;
+  const rowHeight = 64;
+  const n = Math.min(5, safeStats.length);
+
+  const rowsCount = n || 1;
+  const firstBase = 1024 - padBottom - (rowsCount - 1) * rowHeight;
+  const yTopRect = firstBase - 46;
+  const yBottomRect = 1024 - padBottom - 46 + 56;
+  const lineX = padX - 40;
+  const lineY1 = yTopRect - 24;
+  const lineY2 = yBottomRect + 18;
 
   const rows = Array.from({ length: n }).map((_, i) => {
-    const y = 1024 - pad - 20 - (n - 1 - i) * line;
+    const yBase = 1024 - padBottom - (rowsCount - 1 - i) * rowHeight;
+    const rectY = yBase - 46;
+    const labelY = yBase - 18;
+    const valueY = yBase + 10;
     const s = safeStats[i];
+
+    const rawLabel = (s?.label || '').toString().toUpperCase();
+    const rawValue = (s?.value || '').toString();
+
     return (
-      <text
-        key={i}
-        x={pad}
-        y={y}
-        fill="#e5efff"
-        stroke="#020617"
-        strokeWidth={1.2}
-        paintOrder="stroke fill"
-        style={{
-          fontFamily: 'Inter,Segoe UI,Arial',
-          fontSize: 28,
-          fontWeight: 600,
-        }}
-      >
-        {s.label}:
-        <tspan
-          fill="#facc15"
-          stroke="#020617"
-          strokeWidth={1.2}
-          paintOrder="stroke fill"
-          style={{ fontWeight: 800 }}
+      <g key={i}>
+        {/* پس‌زمینه هر ردیف */}
+        <rect
+          x={padX - 8}
+          y={rectY}
+          width={520}
+          height={56}
+          rx={18}
+          ry={18}
+          fill="#020617"
+          fillOpacity={0.82}
+        />
+        <rect
+          x={padX - 8}
+          y={rectY}
+          width={6}
+          height={56}
+          rx={3}
+          ry={3}
+          fill="#38BDF8"
+        />
+        {/* لیبل */}
+        <text
+          x={padX + 20}
+          y={labelY}
+          fill="#9CA3AF"
+          style={{
+            fontFamily:
+              "system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
+            fontSize: 17,
+            letterSpacing: '0.18em',
+          }}
         >
-          {' '}{s.value}
-        </tspan>
-      </text>
+          {rawLabel}
+        </text>
+        {/* مقدار */}
+        <text
+          x={padX + 20}
+          y={valueY}
+          fill="#FACC15"
+          style={{
+            fontFamily:
+              "system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
+            fontSize: 26,
+            fontWeight: 700,
+          }}
+        >
+          {rawValue}
+        </text>
+      </g>
     );
   });
 
@@ -299,41 +359,54 @@ function LiveOverlay({
     <svg viewBox="0 0 1024 1024" preserveAspectRatio="none" width="100%" height="100%">
       <defs>
         <linearGradient id="topFade" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#000000" stopOpacity={0.55} />
-          <stop offset="60%" stopColor="#000000" stopOpacity={0} />
+          <stop offset="0%" stopColor="#000000" stopOpacity={0.58} />
+          <stop offset="65%" stopColor="#000000" stopOpacity={0} />
         </linearGradient>
         <linearGradient id="bottomFade" x1="0" y1="1" x2="0" y2="0">
-          <stop offset="0%" stopColor="#000000" stopOpacity={0.5} />
+          <stop offset="0%" stopColor="#000000" stopOpacity={0.52} />
           <stop offset="55%" stopColor="#000000" stopOpacity={0} />
+        </linearGradient>
+        <linearGradient id="leftRail" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#38BDF8" stopOpacity={0} />
+          <stop offset="18%" stopColor="#38BDF8" stopOpacity={0.9} />
+          <stop offset="82%" stopColor="#38BDF8" stopOpacity={0.9} />
+          <stop offset="100%" stopColor="#38BDF8" stopOpacity={0} />
         </linearGradient>
       </defs>
 
-      {/* top / bottom fades مثل حالت اولیه */}
-      <rect width="1024" height="430" fill="url(#topFade)" />
-      <rect y={594} width={1024} height={430} fill="url(#bottomFade)" />
+      {/* top / bottom fades */}
+      <rect width={1024} height={260} fill="url(#topFade)" />
+      <rect y={764} width={1024} height={260} fill="url(#bottomFade)" />
+
+      {/* ریل عمودی سمت چپ */}
+      <rect
+        x={lineX - 2}
+        y={lineY1}
+        width={4}
+        height={lineY2 - lineY1}
+        fill="#020617"
+        fillOpacity={0.9}
+      />
+      <rect
+        x={lineX}
+        y={lineY1}
+        width={2}
+        height={lineY2 - lineY1}
+        fill="url(#leftRail)"
+      />
 
       {/* مربع آبی Base بالا راست */}
-      <rect
-        x={924}
-        y={32}
-        width={64}
-        height={64}
-        rx={16}
-        ry={16}
-        fill="#0052ff"
-      />
+      <rect x={924} y={32} width={64} height={64} rx={16} ry={16} fill="#0052ff" />
 
       {title && (
         <text
-          x={pad}
-          y={pad + 14}
+          x={120}
+          y={120}
           fill="#ffffff"
-          stroke="#020617"
-          strokeWidth={2}
-          paintOrder="stroke fill"
           style={{
-            fontFamily: 'Inter,Segoe UI,Arial',
-            fontSize: 42,
+            fontFamily:
+              "system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
+            fontSize: 40,
             fontWeight: 800,
           }}
         >
@@ -342,21 +415,30 @@ function LiveOverlay({
       )}
 
       {addressStr && (
-        <text
-          x={pad}
-          y={pad + (title ? 58 : 52)}
-          fill="#e5efff"
-          stroke="#020617"
-          strokeWidth={1.2}
-          paintOrder="stroke fill"
-          style={{
-            fontFamily: 'Inter,Segoe UI,Arial',
-            fontSize: 28,
-            fontWeight: 600,
-          }}
-        >
-          {addressStr}
-        </text>
+        <g opacity={0.95}>
+          <rect
+            x={120}
+            y={134}
+            rx={999}
+            ry={999}
+            width={280}
+            height={40}
+            fill="#020617"
+            fillOpacity={0.75}
+          />
+          <text
+            x={142}
+            y={161}
+            fill="#E5E7EB"
+            style={{
+              fontFamily:
+                "system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
+              fontSize: 20,
+            }}
+          >
+            {addressStr}
+          </text>
+        </g>
       )}
 
       {rows}
@@ -434,7 +516,7 @@ export default function CardPreviewMint({
           overlay = [
             {
               label: 'Rank',
-              value: V.rank ? V.rank.toLocaleString() : '—',
+              value: V.rank ? `#${V.rank.toLocaleString()}` : '—',
             },
             {
               label: 'Active Months',
@@ -446,11 +528,11 @@ export default function CardPreviewMint({
             },
             {
               label: 'Transactions',
-              value: String(Math.round(V.txs)),
+              value: Math.round(V.txs).toLocaleString(),
             },
             {
               label: 'Unique Contracts',
-              value: String(Math.round(V.uniq)),
+              value: Math.round(V.uniq).toLocaleString(),
             },
             {
               label: 'Average Balance',
@@ -497,7 +579,7 @@ export default function CardPreviewMint({
           overlay = [
             {
               label: 'Rank',
-              value: rank ? Number(rank).toLocaleString() : '—',
+              value: rank ? `#${Number(rank).toLocaleString()}` : '—',
             },
             {
               label: 'Active Months',
@@ -509,11 +591,11 @@ export default function CardPreviewMint({
             },
             {
               label: 'Transactions',
-              value: String(Math.round(txSum)),
+              value: Math.round(txSum).toLocaleString(),
             },
             {
               label: 'Unique Contracts',
-              value: String(Math.round(uniqSum)),
+              value: Math.round(uniqSum).toLocaleString(),
             },
             {
               label: 'Average Balance',
