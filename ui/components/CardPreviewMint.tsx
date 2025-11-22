@@ -142,10 +142,10 @@ function buildOverlaySVG(
     }));
 
   const padLeft = 44;
-  const frameBaseWidth = 320;                     // عرض پایه
+  const frameBaseWidth = 320; // عرض پایه
   const frameX = padLeft - 6;
   const statsWidth = Math.round(frameBaseWidth * 0.9); // ۱۰٪ باریک‌تر
-  const sharedWidth = statsWidth;                // عرض مشترک فریم بالا و پایین
+  const sharedWidth = statsWidth; // عرض مشترک فریم بالا و پایین
   const sharedX = frameX + (frameBaseWidth - sharedWidth) / 2; // X مشترک
 
   const statsTop = 620;
@@ -529,12 +529,11 @@ export default function CardPreviewMint({
         let overlay: Stat[] = [];
 
         // ---- حالت ۱: ساختار /api/metrics → { summary, monthly } ----
-        const monthlyA: any[] =
-          Array.isArray(data.monthly)
-            ? data.monthly
-            : Array.isArray(data.metrics?.monthly)
-            ? data.metrics.monthly
-            : [];
+        const monthlyA: any[] = Array.isArray(data.monthly)
+          ? data.monthly
+          : Array.isArray(data.metrics?.monthly)
+          ? data.metrics.monthly
+          : [];
 
         if (monthlyA.length > 0) {
           const sBal = monthlyA.map((m) => Number(m.avg_balance_eth ?? m.balance_eth ?? 0));
@@ -860,7 +859,10 @@ export default function CardPreviewMint({
           (effectiveAddress
             ? `${effectiveAddress.slice(0, 6)}…${effectiveAddress.slice(-4)}`
             : ''),
+        statsToUse,
+        logoHref,
       );
+
       const r = await fetch('/api/compose-store', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -909,7 +911,7 @@ export default function CardPreviewMint({
       const deadline = Math.floor(Date.now() / 1000) + 3600;
       const nonce = Number(nextNonce || 0);
 
-      // مهم: از composedHash همین تابع استفاده کن، نه state قدیمی
+      // از هشِ تازه استفاده کن، اگر نبود از state قبلی
       let imageHash: string | null = composedHash || cardHash;
       if (!imageHash && composedImg.startsWith('data:')) {
         imageHash = keccak256(dataUrlBytes(composedImg));
