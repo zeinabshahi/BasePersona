@@ -121,7 +121,7 @@ function escapeAddress(s: string): string {
 /**
  * Layout:
  * - فریم کیف بالا و فریم شیشه‌ای پایین، دقیقاً هم‌عرض و هم‌تراز
- * - هر دو ۱۰٪ باریک‌تر از عرض پایه
+ * - فریم شیشه‌ای ۱۰٪ باریک‌تر از عرض پایه و هر دو از یک عرض استفاده می‌کنند
  * - بدون خط عمودی
  * - RANK رنگ متفاوت
  * - فریم کیف دوخطی (MY WALLET + آدرس)
@@ -130,7 +130,7 @@ function buildOverlaySVG(
   title: string | undefined,
   addressStr: string | undefined,
   statsIn: Stat[] | undefined,
-  _logoHref: string = '/base_logo.svg', // فقط برای سازگاری امضاء
+  logoHref: string = '/base_logo.svg', // فقط برای سازگاری امضاء
 ): string {
   const stats = Array.isArray(statsIn) ? statsIn : [];
   const maxRows = 6;
@@ -177,7 +177,7 @@ function buildOverlaySVG(
           fill="#93C5FD"
           font-size="15"
           font-weight="600"
-          font-family="sans-serif"
+          font-family="DejaVu Sans,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"
           letter-spacing="0.18em">
           ${label}
         </text>
@@ -190,7 +190,7 @@ function buildOverlaySVG(
           paint-order="stroke"
           font-size="32"
           font-weight="800"
-          font-family="sans-serif">
+          font-family="DejaVu Sans,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
           ${value}
         </text>
       </g>`;
@@ -204,7 +204,7 @@ function buildOverlaySVG(
             fill="#F9FAFB"
             font-size="34"
             font-weight="800"
-            font-family="sans-serif">
+            font-family="DejaVu Sans,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
         ${titleSafe}
       </text>
     </g>`
@@ -221,14 +221,14 @@ function buildOverlaySVG(
             font-size="15"
             font-weight="600"
             letter-spacing="0.18em"
-            font-family="sans-serif">
+            font-family="DejaVu Sans,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
         MY WALLET
       </text>
       <text x="${padLeft + 22}" y="124"
             fill="#38BDF8"
             font-size="22"
             font-weight="700"
-            font-family="sans-serif">
+            font-family="DejaVu Sans,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
         ${addrSafe}
       </text>
     </g>`
@@ -317,6 +317,9 @@ function LiveOverlay({
   const panelY = statsTop - 90;
   const panelH = rowGap * n + 110;
 
+  const fontFamilyStr =
+    "DejaVu Sans, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+
   return (
     <svg viewBox="0 0 1024 1024" preserveAspectRatio="none" width="100%" height="100%">
       <defs>
@@ -382,8 +385,7 @@ function LiveOverlay({
           y={60}
           fill="#F9FAFB"
           style={{
-            fontFamily:
-              'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+            fontFamily: fontFamilyStr,
             fontSize: 34,
             fontWeight: 800,
           }}
@@ -413,8 +415,7 @@ function LiveOverlay({
             y={98}
             fill="#F9FAFB"
             style={{
-              fontFamily:
-                'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+              fontFamily: fontFamilyStr,
               fontSize: 15,
               fontWeight: 600,
               letterSpacing: '0.18em',
@@ -427,8 +428,7 @@ function LiveOverlay({
             y={124}
             fill="#38BDF8"
             style={{
-              fontFamily:
-                'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+              fontFamily: fontFamilyStr,
               fontSize: 22,
               fontWeight: 700,
             }}
@@ -455,8 +455,7 @@ function LiveOverlay({
               y={yLabel}
               fill="#93C5FD"
               style={{
-                fontFamily:
-                  'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+                fontFamily: fontFamilyStr,
                 fontSize: 15,
                 fontWeight: 600,
                 letterSpacing: '0.18em',
@@ -471,8 +470,7 @@ function LiveOverlay({
               stroke="#020617"
               strokeWidth={0.6}
               style={{
-                fontFamily:
-                  'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+                fontFamily: fontFamilyStr,
                 fontSize: 32,
                 fontWeight: 800,
                 paintOrder: 'stroke',
@@ -520,9 +518,7 @@ export default function CardPreviewMint({
         return;
       }
       try {
-        const r = await fetch(`/api/metrics?address=${effectiveAddress}`, {
-          cache: 'no-store',
-        });
+        const r = await fetch(`/api/metrics?address=${effectiveAddress}`, { cache: 'no-store' });
         if (!r.ok) throw new Error(`metrics ${r.status}`);
         const data: any = await r.json();
 
@@ -538,21 +534,11 @@ export default function CardPreviewMint({
           : [];
 
         if (monthlyA.length > 0) {
-          const sBal = monthlyA.map((m) =>
-            Number(m.avg_balance_eth ?? m.balance_eth ?? 0),
-          );
-          const sTxs = monthlyA.map((m) =>
-            Number(m.native_txs ?? m.txs ?? 0),
-          );
-          const sUniq = monthlyA.map((m) =>
-            Number(m.uniq_contracts ?? m.uniq ?? 0),
-          );
-          const sDays = monthlyA.map((m) =>
-            Number(m.uniq_days ?? m.days ?? 0),
-          );
-          const sRank = monthlyA.map((m) =>
-            Number(m.ranks?.overall?.rank ?? m.rank_m ?? 0),
-          );
+          const sBal = monthlyA.map((m) => Number(m.avg_balance_eth ?? m.balance_eth ?? 0));
+          const sTxs = monthlyA.map((m) => Number(m.native_txs ?? m.txs ?? 0));
+          const sUniq = monthlyA.map((m) => Number(m.uniq_contracts ?? m.uniq ?? 0));
+          const sDays = monthlyA.map((m) => Number(m.uniq_days ?? m.days ?? 0));
+          const sRank = monthlyA.map((m) => Number(m.ranks?.overall?.rank ?? m.rank_m ?? 0));
 
           const activeMonths = monthlyA.filter(
             (m) =>
@@ -567,9 +553,7 @@ export default function CardPreviewMint({
             uniq: sum(sUniq),
             days: sum(sDays),
             months: activeMonths,
-            rank: sRank.filter((x) => x > 0).length
-              ? Math.min(...sRank.filter((x) => x > 0))
-              : 0,
+            rank: sRank.filter((x) => x > 0).length ? Math.min(...sRank.filter((x) => x > 0)) : 0,
           };
 
           overlay = [
@@ -605,8 +589,7 @@ export default function CardPreviewMint({
           const monthsObj = root.months || {};
           const monthsArr = Object.values(monthsObj) as any[];
 
-          const rank =
-            root.rank ?? lifetime.rank ?? root.rank_lt ?? root.composite_rank_lt ?? 0;
+          const rank = root.rank ?? lifetime.rank ?? root.rank_lt ?? root.composite_rank_lt ?? 0;
 
           const txSum =
             lifetime.tx_sum ??
@@ -616,10 +599,7 @@ export default function CardPreviewMint({
             lifetime.uniq_sum ??
             monthsArr.reduce((acc, m) => acc + Number(m.uniq || 0), 0);
 
-          const daysSum = monthsArr.reduce(
-            (acc, m) => acc + Number(m.days || 0),
-            0,
-          );
+          const daysSum = monthsArr.reduce((acc, m) => acc + Number(m.days || 0), 0);
 
           const activeMonths = monthsArr.filter(
             (m) =>
@@ -631,8 +611,7 @@ export default function CardPreviewMint({
           const balanceMean =
             lifetime.avg_balance_eth_mean ??
             (monthsArr.length
-              ? monthsArr.reduce((acc, m) => acc + Number(m.bal || 0), 0) /
-                monthsArr.length
+              ? monthsArr.reduce((acc, m) => acc + Number(m.bal || 0), 0) / monthsArr.length
               : 0);
 
           overlay = [
@@ -733,12 +712,7 @@ export default function CardPreviewMint({
   const [cardImg, setCardImg] = useState<string | null>(null);
   const [cardHash, setCardHash] = useState<string | null>(null);
   const [tokenUri, setTokenUri] = useState<string | null>(null);
-  const [busy, setBusy] = useState<{
-    gen?: boolean;
-    compose?: boolean;
-    mint?: boolean;
-    paying?: boolean;
-  }>({});
+  const [busy, setBusy] = useState<{ gen?: boolean; compose?: boolean; mint?: boolean; paying?: boolean }>({});
   const [error, setError] = useState<string | null>(null);
   const [payTx, setPayTx] = useState<string | null>(null);
   const [mintTx, setMintTx] = useState<string | null>(null);

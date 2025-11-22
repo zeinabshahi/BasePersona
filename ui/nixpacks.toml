@@ -3,10 +3,10 @@ PORT = "3000"
 NODE_ENV = "production"
 
 [phases.setup]
-# اگر واقعاً از nixPkgs استفاده می‌کنی نگهش دار، ضرری نداره
+# پکیج‌های نیکسی که نیاز داری (همونی که قبلاً داشتی)
 nixPkgs = ["nodejs_20", "python3", "gcc", "gnumake"]
 
-# اینجا فونت‌های لازم برای رندر SVG روی لینوکس نصب می‌شن
+# فونت‌های لازم برای رندر SVG روی لینوکس (جلوگیری از مربع شدن حروف)
 aptPkgs = [
   "fonts-dejavu-core",
   "fonts-liberation",
