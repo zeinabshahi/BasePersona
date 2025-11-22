@@ -25,13 +25,13 @@ type Props = {
   title?: string;
   subtitle?: string;
   stats?: Stat[];
-  badgeText?: string;
+  badgeText?: string; // فعلاً استفاده نمی‌کنیم (قبلاً ALL-TIME بود)
   placeholderSrc?: string;
   logoHref?: string;
 
   // Optional API inputs
   address?: string; // falls back to connected wallet
-  traitsJson?: ImageTraits | null;
+  traitsJson?: ImageTraits | null; // فقط برای /api/generate
   persona?: any;
 };
 
@@ -120,16 +120,18 @@ function escapeAddress(s: string): string {
 
 /**
  * Layout:
- * - فریم کیف بالا و فریم شیشه‌ای پایین، دقیقاً هم‌عرض و هم‌تراز (۱۰٪ باریک‌تر از پایه)
+ * - فریم کیف بالا و فریم شیشه‌ای پایین، دقیقاً هم‌عرض و هم‌تراز
+ * - فریم‌ها ۱۰٪ باریک‌تر از عرض پایه
  * - بدون خط عمودی
  * - RANK رنگ متفاوت
  * - فریم کیف دوخطی (MY WALLET + آدرس)
+ * - این نسخه برای رندر روی سرور فقط از فونت‌های generic استفاده می‌کند (sans-serif)
  */
 function buildOverlaySVG(
   title: string | undefined,
   addressStr: string | undefined,
   statsIn: Stat[] | undefined,
-  logoHref: string = '/base_logo.svg',
+  _logoHref: string = '/base_logo.svg',
 ): string {
   const stats = Array.isArray(statsIn) ? statsIn : [];
   const maxRows = 6;
@@ -141,11 +143,11 @@ function buildOverlaySVG(
     }));
 
   const padLeft = 44;
-  const frameBaseWidth = 320;           // عرض پایه
+  const frameBaseWidth = 320; // عرض پایه
   const frameX = padLeft - 6;
   const statsWidth = Math.round(frameBaseWidth * 0.9); // ۱۰٪ باریک‌تر
-  const sharedWidth = statsWidth;       // عرض مشترک بالا/پایین
-  const sharedX = frameX + (frameBaseWidth - sharedWidth) / 2;
+  const sharedWidth = statsWidth; // عرض مشترک فریم بالا و پایین
+  const sharedX = frameX + (frameBaseWidth - sharedWidth) / 2; // X مشترک
 
   const statsTop = 620;
   const rowGap = 60;
@@ -176,8 +178,7 @@ function buildOverlaySVG(
           fill="#93C5FD"
           font-size="15"
           font-weight="600"
-          font-family="DejaVu Sans,Liberation Sans,system-ui,sans-serif"
-          letter-spacing="0.18em">
+          font-family="sans-serif">
           ${label}
         </text>
         <text
@@ -189,7 +190,7 @@ function buildOverlaySVG(
           paint-order="stroke"
           font-size="32"
           font-weight="800"
-          font-family="DejaVu Sans,Liberation Sans,system-ui,sans-serif">
+          font-family="sans-serif">
           ${value}
         </text>
       </g>`;
@@ -203,7 +204,7 @@ function buildOverlaySVG(
             fill="#F9FAFB"
             font-size="34"
             font-weight="800"
-            font-family="DejaVu Sans,Liberation Sans,system-ui,sans-serif">
+            font-family="sans-serif">
         ${titleSafe}
       </text>
     </g>`
@@ -219,15 +220,14 @@ function buildOverlaySVG(
             fill="#F9FAFB"
             font-size="15"
             font-weight="600"
-            letter-spacing="0.18em"
-            font-family="DejaVu Sans,Liberation Sans,system-ui,sans-serif">
+            font-family="sans-serif">
         MY WALLET
       </text>
       <text x="${padLeft + 22}" y="124"
             fill="#38BDF8"
             font-size="22"
             font-weight="700"
-            font-family="DejaVu Sans,Liberation Sans,system-ui,sans-serif">
+            font-family="sans-serif">
         ${addrSafe}
       </text>
     </g>`
@@ -245,6 +245,7 @@ function buildOverlaySVG(
       <stop offset="100%" stop-color="#020617" stop-opacity="0.35" />
     </linearGradient>
 
+    <!-- گرادیانت و سایه برای مکعب Base -->
     <linearGradient id="baseCubeGrad" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0%" stop-color="#38BDF8" />
       <stop offset="40%" stop-color="#0EA5E9" />
@@ -266,7 +267,7 @@ function buildOverlaySVG(
           fill="url(#baseCubeHighlight)" fill-opacity="0.55" />
   </g>
 
-  <!-- پنل شیشه‌ای پایین؛ هم‌عرض فریم کیف -->
+  <!-- پنل شیشه‌ای برای استت‌ها (۱۰٪ باریک‌تر و هم‌عرض فریم کیف) -->
   <rect x="${sharedX}" y="${panelY}" width="${sharedWidth}" height="${panelH}"
         rx="24" ry="24"
         fill="url(#panelBg)"
@@ -274,9 +275,11 @@ function buildOverlaySVG(
         stroke-width="1.5"
         stroke-opacity="0.35" />
 
+  <!-- عنوان و آدرس -->
   ${titleBlock}
   ${addrBlock}
 
+  <!-- ردیف‌های استت -->
   ${rows}
 </svg>`;
 }
@@ -313,9 +316,6 @@ function LiveOverlay({
   const panelY = statsTop - 90;
   const panelH = rowGap * n + 110;
 
-  const fontFamily =
-    "DejaVu Sans, Liberation Sans, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
-
   return (
     <svg viewBox="0 0 1024 1024" preserveAspectRatio="none" width="100%" height="100%">
       <defs>
@@ -324,6 +324,7 @@ function LiveOverlay({
           <stop offset="100%" stopColor="#020617" stopOpacity={0.35} />
         </linearGradient>
 
+        {/* گرادیانت و سایه لوگوی Base */}
         <linearGradient id="baseCubeGradLive" x1="0" y1="0" x2="1" y2="1">
           <stop offset="0%" stopColor="#38BDF8" />
           <stop offset="40%" stopColor="#0EA5E9" />
@@ -359,7 +360,7 @@ function LiveOverlay({
         />
       </g>
 
-      {/* پنل شیشه‌ای پایین، هم‌عرض فریم کیف */}
+      {/* پنل شیشه‌ای پایین، ۱۰٪ باریک‌تر و هم‌عرض فریم کیف */}
       <rect
         x={sharedX}
         y={panelY}
@@ -380,7 +381,8 @@ function LiveOverlay({
           y={60}
           fill="#F9FAFB"
           style={{
-            fontFamily,
+            fontFamily:
+              "Space Grotesk,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
             fontSize: 34,
             fontWeight: 800,
           }}
@@ -389,7 +391,7 @@ function LiveOverlay({
         </text>
       )}
 
-      {/* فریم کیف دوخطی، هم‌عرض با پنل پایین */}
+      {/* فریم کیف دوخطی و هم‌عرض با پایین */}
       {addressStr && (
         <g opacity={0.96}>
           <rect
@@ -410,7 +412,8 @@ function LiveOverlay({
             y={98}
             fill="#F9FAFB"
             style={{
-              fontFamily,
+              fontFamily:
+                "Space Grotesk,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
               fontSize: 15,
               fontWeight: 600,
               letterSpacing: '0.18em',
@@ -423,7 +426,8 @@ function LiveOverlay({
             y={124}
             fill="#38BDF8"
             style={{
-              fontFamily,
+              fontFamily:
+                "Space Grotesk,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
               fontSize: 22,
               fontWeight: 700,
             }}
@@ -433,7 +437,7 @@ function LiveOverlay({
         </g>
       )}
 
-      {/* ردیف‌های استت */}
+      {/* ردیف‌های استت با فاصله بیشتر و Rank رنگ متفاوت */}
       {rowsArr.map((s, i) => {
         const yLabel = statsTop + rowGap * i;
         const yValue = yLabel + 26;
@@ -450,7 +454,8 @@ function LiveOverlay({
               y={yLabel}
               fill="#93C5FD"
               style={{
-                fontFamily,
+                fontFamily:
+                  "Space Grotesk,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
                 fontSize: 15,
                 fontWeight: 600,
                 letterSpacing: '0.18em',
@@ -465,7 +470,8 @@ function LiveOverlay({
               stroke="#020617"
               strokeWidth={0.6}
               style={{
-                fontFamily,
+                fontFamily:
+                  "Space Grotesk,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
                 fontSize: 32,
                 fontWeight: 800,
                 paintOrder: 'stroke',
@@ -513,9 +519,7 @@ export default function CardPreviewMint({
         return;
       }
       try {
-        const r = await fetch(`/api/metrics?address=${effectiveAddress}`, {
-          cache: 'no-store',
-        });
+        const r = await fetch(`/api/metrics?address=${effectiveAddress}`, { cache: 'no-store' });
         if (!r.ok) throw new Error(`metrics ${r.status}`);
         const data: any = await r.json();
 
@@ -523,7 +527,7 @@ export default function CardPreviewMint({
 
         let overlay: Stat[] = [];
 
-        // حالت ۱: /api/metrics → { monthly: [...] }
+        // ---- حالت ۱: ساختار /api/metrics → { summary, monthly } ----
         const monthlyA: any[] = Array.isArray(data.monthly)
           ? data.monthly
           : Array.isArray(data.metrics?.monthly)
@@ -554,15 +558,33 @@ export default function CardPreviewMint({
           };
 
           overlay = [
-            { label: 'Rank', value: V.rank ? V.rank.toLocaleString() : '—' },
-            { label: 'Active Months', value: String(V.months) },
-            { label: 'Active Days', value: String(Math.round(V.days)) },
-            { label: 'Transactions', value: Math.round(V.txs).toLocaleString() },
-            { label: 'Unique Contracts', value: Math.round(V.uniq).toLocaleString() },
-            { label: 'Average Balance', value: `${V.balance.toFixed(3)} ETH` },
+            {
+              label: 'Rank',
+              value: V.rank ? V.rank.toLocaleString() : '—', // بدون #
+            },
+            {
+              label: 'Active Months',
+              value: String(V.months),
+            },
+            {
+              label: 'Active Days',
+              value: String(Math.round(V.days)),
+            },
+            {
+              label: 'Transactions',
+              value: Math.round(V.txs).toLocaleString(),
+            },
+            {
+              label: 'Unique Contracts',
+              value: Math.round(V.uniq).toLocaleString(),
+            },
+            {
+              label: 'Average Balance',
+              value: `${V.balance.toFixed(3)} ETH`,
+            },
           ];
         } else {
-          // حالت ۲: ساختار wallets_FULL
+          // ---- حالت ۲: ساختار wallets_FULL → { wallet, rank, lifetime, months:{...} } ----
           const root: any = data.metrics || data;
           const lifetime = root.lifetime || {};
           const monthsObj = root.months || {};
@@ -594,12 +616,30 @@ export default function CardPreviewMint({
               : 0);
 
           overlay = [
-            { label: 'Rank', value: rank ? Number(rank).toLocaleString() : '—' },
-            { label: 'Active Months', value: String(activeMonths) },
-            { label: 'Active Days', value: String(Math.round(daysSum)) },
-            { label: 'Transactions', value: Math.round(txSum).toLocaleString() },
-            { label: 'Unique Contracts', value: Math.round(uniqSum).toLocaleString() },
-            { label: 'Average Balance', value: `${Number(balanceMean || 0).toFixed(3)} ETH` },
+            {
+              label: 'Rank',
+              value: rank ? Number(rank).toLocaleString() : '—',
+            },
+            {
+              label: 'Active Months',
+              value: String(activeMonths),
+            },
+            {
+              label: 'Active Days',
+              value: String(Math.round(daysSum)),
+            },
+            {
+              label: 'Transactions',
+              value: Math.round(txSum).toLocaleString(),
+            },
+            {
+              label: 'Unique Contracts',
+              value: Math.round(uniqSum).toLocaleString(),
+            },
+            {
+              label: 'Average Balance',
+              value: `${Number(balanceMean || 0).toFixed(3)} ETH`,
+            },
           ];
         }
 
@@ -623,6 +663,7 @@ export default function CardPreviewMint({
     };
   }, [effectiveAddress]);
 
+  // اول متریک‌های خودمون، بعد اگر نبود، props.stats
   const statsToUse: Stat[] =
     metricsStats && metricsStats.length > 0
       ? metricsStats
@@ -672,12 +713,7 @@ export default function CardPreviewMint({
   const [cardImg, setCardImg] = useState<string | null>(null);
   const [cardHash, setCardHash] = useState<string | null>(null);
   const [tokenUri, setTokenUri] = useState<string | null>(null);
-  const [busy, setBusy] = useState<{
-    gen?: boolean;
-    compose?: boolean;
-    mint?: boolean;
-    paying?: boolean;
-  }>({});
+  const [busy, setBusy] = useState<{ gen?: boolean; compose?: boolean; mint?: boolean; paying?: boolean }>({});
   const [error, setError] = useState<string | null>(null);
   const [payTx, setPayTx] = useState<string | null>(null);
   const [mintTx, setMintTx] = useState<string | null>(null);
@@ -874,6 +910,7 @@ export default function CardPreviewMint({
       const deadline = Math.floor(Date.now() / 1000) + 3600;
       const nonce = Number(nextNonce || 0);
 
+      // از هشِ تازه استفاده کن، اگر نبود از state قبلی
       let imageHash: string | null = composedHash || cardHash;
       if (!imageHash && composedImg.startsWith('data:')) {
         imageHash = keccak256(dataUrlBytes(composedImg));
@@ -1066,7 +1103,7 @@ export default function CardPreviewMint({
               style={{
                 width: `${pct}%`,
                 height: '100%',
-                background: 'linear-gradient(90deg,#60a5fa,#a78bfa)',
+                background: 'linear-gradient(90deg,#60a5fa,#a78bfa)`,
                 transition: 'width .3s',
               }}
             />
@@ -1192,6 +1229,7 @@ export default function CardPreviewMint({
         )}
       </div>
 
+      {/* After mint badge */}
       {mintTx && <div className="badge">Mint tx: {mintTx.slice(0, 10)}…</div>}
     </div>
   );
