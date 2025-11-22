@@ -21,17 +21,17 @@ type ImageTraits = {
 
 type Props = {
   // UI
-  defaultPrompt: string;   // transparency only; server builds locked prompt
+  defaultPrompt: string; // transparency only; server builds locked prompt
   title?: string;
   subtitle?: string;
   stats?: Stat[];
-  badgeText?: string;      // فعلاً استفاده نمی‌کنیم (قبلاً ALL-TIME بود)
+  badgeText?: string; // فعلاً استفاده نمی‌کنیم (قبلاً ALL-TIME بود)
   placeholderSrc?: string;
   logoHref?: string;
 
   // Optional API inputs
-  address?: string;        // falls back to connected wallet
-  traitsJson?: ImageTraits | null;  // فقط برای /api/generate
+  address?: string; // falls back to connected wallet
+  traitsJson?: ImageTraits | null; // فقط برای /api/generate
   persona?: any;
 };
 
@@ -80,7 +80,9 @@ function fmtEth(wei: unknown, decimals = 6): string {
     const s = formatEther(toBigIntSafe(wei));
     const n = Number(s);
     return n.toFixed(decimals).replace(/\.?0+$/, '');
-  } catch { return '0'; }
+  } catch {
+    return '0';
+  }
 }
 
 function toBigIntSafe(x: unknown): bigint {
@@ -108,7 +110,7 @@ function toNumberSafe(x: unknown, fallback = 0): number {
 const sum = (arr: number[]) => arr.reduce((a, b) => a + b, 0);
 const mean = (arr: number[]) => (arr.length ? sum(arr) / arr.length : 0);
 
-// ---------- Build SVG overlay (server-side composition uses this) ----------
+// ---------- Build SVG overlay ----------
 function escapeXml(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
@@ -116,6 +118,13 @@ function escapeAddress(s: string): string {
   return escapeXml(s);
 }
 
+/**
+ * Layout: گیم‌طور
+ * - فریم کیف و پنل شیشه‌ای دقیقاً هم‌عرض، پنل شیشه‌ای هم‌مرکز با کیف
+ * - بدون خط عمودی
+ * - RANK رنگ متفاوت
+ * - فریم کیف دوخطی (MY WALLET + آدرس)
+ */
 function buildOverlaySVG(
   title: string | undefined,
   addressStr: string | undefined,
@@ -123,79 +132,78 @@ function buildOverlaySVG(
   logoHref: string = '/base_logo.svg', // فقط برای سازگاری امضاء
 ): string {
   const stats = Array.isArray(statsIn) ? statsIn : [];
-  const max = Math.min(5, stats.length);       // حداکثر ۵ ردیف روی تصویر نهایی
-
+  const maxRows = 6;
   const safeStats = stats
-    .slice(0, max)
+    .slice(0, maxRows)
     .map((s) => ({
       label: (s?.label ?? '').toString(),
       value: (s?.value ?? '').toString(),
     }));
 
-  const padX = 120;
-  const padBottom = 90;
-  const rowHeight = 64;
+  const padLeft = 44;
+  const frameX = padLeft - 6;
+  const frameWidthFull = 320; // عرض پایه
+  const commonWidth = Math.round(frameWidthFull * 0.9); // عرض نهایی (۱۰٪ کمتر)
+  const commonX = frameX + (frameWidthFull - commonWidth) / 2; // وسط فریم پایه
+  const textX = commonX + 22;
 
-  const rowsCount = safeStats.length || 1;
-  const firstBase = 1024 - padBottom - (rowsCount - 1) * rowHeight;
-  const yTopRect = firstBase - 46;
-  const yBottomRect = 1024 - padBottom - 46 + 56;
-  const lineX = padX - 40;
-  const lineY1 = yTopRect - 24;
-  const lineY2 = yBottomRect + 18;
+  const statsTop = 620; // استت‌ها پایین
+  const rowGap = 60; // فاصله زیاد بین ردیف‌ها
+  const n = safeStats.length || 1;
+
+  const panelY = statsTop - 90;
+  const panelH = rowGap * n + 110;
+
+  const titleSafe = title ? escapeXml(title) : '';
+  const addrSafe = addressStr ? escapeAddress(addressStr) : '';
 
   const rows = safeStats
     .map((row, i) => {
-      const yBase = 1024 - padBottom - (rowsCount - 1 - i) * rowHeight;
-      const rectY = yBase - 46;
-      const labelY = yBase - 18;
-      const valueY = yBase + 10;
+      const yLabel = statsTop + rowGap * i;
+      const yValue = yLabel + 26; // فاصله بیشتر برای عدد بزرگ‌تر
 
-      const rawLabel = (row.label || '').toString();
+      const rawLabel = row.label || '';
       const label = escapeXml(rawLabel.toUpperCase());
-      const value = escapeXml(row.value || '');
+      const value = escapeXml(row.value);
+      const isRank = rawLabel.trim().toLowerCase() === 'rank';
+      const valueColor = isRank ? '#FACC15' : '#22D3EE'; // Rank طلایی‌نئون
 
       return `
       <g>
-        <!-- پس‌زمینه نیمه‌شفاف هر ردیف -->
-        <rect x="${padX - 8}" y="${rectY}" width="520" height="56" rx="18" ry="18"
-              fill="#020617" fill-opacity="0.82" />
-        <!-- نوار آبی کوچک کنار متن -->
-        <rect x="${padX - 8}" y="${rectY}" width="6" height="56" rx="3" ry="3"
-              fill="#38BDF8" />
-
-        <!-- لیبل -->
-        <text x="${padX + 20}" y="${labelY}"
-              fill="#9CA3AF"
-              font-size="17"
-              font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"
-              letter-spacing="0.18em">
+        <text
+          x="${textX}"
+          y="${yLabel}"
+          fill="#93C5FD"
+          font-size="15"
+          font-weight="600"
+          font-family="Space Grotesk,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"
+          letter-spacing="0.18em">
           ${label}
         </text>
-
-        <!-- مقدار -->
-        <text x="${padX + 20}" y="${valueY}"
-              fill="#FACC15"
-              font-size="26"
-              font-weight="700"
-              font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+        <text
+          x="${textX}"
+          y="${yValue}"
+          fill="${valueColor}"
+          stroke="#020617"
+          stroke-width="0.6"
+          paint-order="stroke"
+          font-size="32"
+          font-weight="800"
+          font-family="Space Grotesk,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
           ${value}
         </text>
       </g>`;
     })
     .join('\n');
 
-  const titleSafe = title ? escapeXml(title) : '';
-  const addrSafe = addressStr ? escapeAddress(addressStr) : '';
-
   const titleBlock = titleSafe
     ? `
     <g>
-      <text x="120" y="140"
+      <text x="${padLeft}" y="60"
             fill="#F9FAFB"
-            font-size="40"
+            font-size="34"
             font-weight="800"
-            font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+            font-family="Space Grotesk,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
         ${titleSafe}
       </text>
     </g>`
@@ -203,13 +211,23 @@ function buildOverlaySVG(
 
   const addrBlock = addrSafe
     ? `
-    <g opacity="0.95">
-      <rect x="120" y="154" rx="999" ry="999" width="280" height="40"
-            fill="#020617" fill-opacity="0.75" />
-      <text x="142" y="181"
-            fill="#E5E7EB"
-            font-size="20"
-            font-family="system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+    <g opacity="0.96">
+      <rect x="${commonX}" y="72" rx="18" ry="18" width="${commonWidth}" height="68"
+            fill="url(#panelBg)"
+            stroke="#38BDF8" stroke-width="1.2" stroke-opacity="0.45" />
+      <text x="${textX}" y="98"
+            fill="#93C5FD"
+            font-size="15"
+            font-weight="600"
+            letter-spacing="0.18em"
+            font-family="Space Grotesk,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+        MY WALLET
+      </text>
+      <text x="${textX}" y="124"
+            fill="#22D3EE"
+            font-size="22"
+            font-weight="700"
+            font-family="Space Grotesk,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
         ${addrSafe}
       </text>
     </g>`
@@ -222,43 +240,46 @@ function buildOverlaySVG(
      height="1024"
      xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <linearGradient id="topFade" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%"  stop-color="#000000" stop-opacity="0.58" />
-      <stop offset="65%" stop-color="#000000" stop-opacity="0" />
+    <linearGradient id="panelBg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#020617" stop-opacity="0.60" />
+      <stop offset="100%" stop-color="#020617" stop-opacity="0.35" />
     </linearGradient>
-    <linearGradient id="bottomFade" x1="0" y1="1" x2="0" y2="0">
-      <stop offset="0%"  stop-color="#000000" stop-opacity="0.52" />
-      <stop offset="55%" stop-color="#000000" stop-opacity="0" />
+
+    <!-- گرادیانت و سایه برای مکعب Base -->
+    <linearGradient id="baseCubeGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#38BDF8" />
+      <stop offset="40%" stop-color="#0EA5E9" />
+      <stop offset="100%" stop-color="#0369A1" />
     </linearGradient>
-    <linearGradient id="leftRail" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%"  stop-color="#38BDF8" stop-opacity="0.0" />
-      <stop offset="18%" stop-color="#38BDF8" stop-opacity="0.9" />
-      <stop offset="82%" stop-color="#38BDF8" stop-opacity="0.9" />
-      <stop offset="100%" stop-color="#38BDF8" stop-opacity="0.0" />
+    <linearGradient id="baseCubeHighlight" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#E0F2FE" />
+      <stop offset="100%" stop-color="#0EA5E9" />
     </linearGradient>
+    <filter id="softShadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#0F172A" flood-opacity="0.45" />
+    </filter>
   </defs>
 
-  <!-- شیدر بالا و پایین برای خوانایی متن -->
-  <rect x="0" y="0"    width="1024" height="260" fill="url(#topFade)" />
-  <rect x="0" y="764"  width="1024" height="260" fill="url(#bottomFade)" />
+  <!-- مربع آبی بالا راست (لوگوی بیس) -->
+  <g filter="url(#softShadow)">
+    <rect x="888" y="80" width="56" height="56" rx="18" ry="18" fill="url(#baseCubeGrad)" />
+    <rect x="888" y="80" width="56" height="28" rx="18" ry="18"
+          fill="url(#baseCubeHighlight)" fill-opacity="0.55" />
+  </g>
 
-  <!-- ریل عمودی سمت چپ (حس HUD / گیمی) -->
-  <rect x="${lineX - 2}" y="${lineY1}" width="4" height="${lineY2 - lineY1}"
-        fill="#020617" fill-opacity="0.9" />
-  <rect x="${lineX}" y="${lineY1}" width="2" height="${lineY2 - lineY1}"
-        fill="url(#leftRail)" />
+  <!-- پنل شیشه‌ای برای استت‌ها (هم‌عرض فریم کیف) -->
+  <rect x="${commonX}" y="${panelY}" width="${commonWidth}" height="${panelH}"
+        rx="24" ry="24"
+        fill="url(#panelBg)"
+        stroke="#38BDF8"
+        stroke-width="1.5"
+        stroke-opacity="0.35" />
 
-  <!-- لوگوی مربع بالا راست کارت -->
-  <rect x="872" y="104" width="40" height="40" rx="12" ry="12"
-        fill="#0EA5E9" />
-  <rect x="882" y="114" width="20" height="20" rx="5" ry="5"
-        fill="#0F172A" fill-opacity="0.65" />
-
-  <!-- عنوان و آدرس کوتاه -->
+  <!-- عنوان و آدرس -->
   ${titleBlock}
   ${addrBlock}
 
-  <!-- ردیف‌های استت‌ها -->
+  <!-- ردیف‌های استت -->
   ${rows}
 </svg>`;
 }
@@ -268,7 +289,7 @@ function LiveOverlay({
   title,
   addressStr,
   stats = [],
-  badgeText,          // فعلاً استفاده نمی‌کنیم
+  badgeText,
   logoHref = '/base_logo.svg',
 }: {
   title?: string;
@@ -278,135 +299,91 @@ function LiveOverlay({
   logoHref?: string;
 }) {
   const safeStats = Array.isArray(stats) ? stats : [];
-  const padX = 120;
-  const padBottom = 90;
-  const rowHeight = 64;
-  const n = Math.min(5, safeStats.length);
+  const maxRows = 6;
+  const rowsArr = safeStats.slice(0, maxRows);
 
-  const rowsCount = n || 1;
-  const firstBase = 1024 - padBottom - (rowsCount - 1) * rowHeight;
-  const yTopRect = firstBase - 46;
-  const yBottomRect = 1024 - padBottom - 46 + 56;
-  const lineX = padX - 40;
-  const lineY1 = yTopRect - 24;
-  const lineY2 = yBottomRect + 18;
+  const padLeft = 44;
+  const frameX = padLeft - 6;
+  const frameWidthFull = 320;
+  const commonWidth = Math.round(frameWidthFull * 0.9);
+  const commonX = frameX + (frameWidthFull - commonWidth) / 2;
+  const textX = commonX + 22;
 
-  const rows = Array.from({ length: n }).map((_, i) => {
-    const yBase = 1024 - padBottom - (rowsCount - 1 - i) * rowHeight;
-    const rectY = yBase - 46;
-    const labelY = yBase - 18;
-    const valueY = yBase + 10;
-    const s = safeStats[i];
+  const statsTop = 620;
+  const rowGap = 60;
+  const n = rowsArr.length || 1;
 
-    const rawLabel = (s?.label || '').toString().toUpperCase();
-    const rawValue = (s?.value || '').toString();
-
-    return (
-      <g key={i}>
-        {/* پس‌زمینه هر ردیف */}
-        <rect
-          x={padX - 8}
-          y={rectY}
-          width={520}
-          height={56}
-          rx={18}
-          ry={18}
-          fill="#020617"
-          fillOpacity={0.82}
-        />
-        <rect
-          x={padX - 8}
-          y={rectY}
-          width={6}
-          height={56}
-          rx={3}
-          ry={3}
-          fill="#38BDF8"
-        />
-        {/* لیبل */}
-        <text
-          x={padX + 20}
-          y={labelY}
-          fill="#9CA3AF"
-          style={{
-            fontFamily:
-              "system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
-            fontSize: 17,
-            letterSpacing: '0.18em',
-          }}
-        >
-          {rawLabel}
-        </text>
-        {/* مقدار */}
-        <text
-          x={padX + 20}
-          y={valueY}
-          fill="#FACC15"
-          style={{
-            fontFamily:
-              "system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
-            fontSize: 26,
-            fontWeight: 700,
-          }}
-        >
-          {rawValue}
-        </text>
-      </g>
-    );
-  });
+  const panelY = statsTop - 90;
+  const panelH = rowGap * n + 110;
 
   return (
     <svg viewBox="0 0 1024 1024" preserveAspectRatio="none" width="100%" height="100%">
       <defs>
-        <linearGradient id="topFade" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#000000" stopOpacity={0.58} />
-          <stop offset="65%" stopColor="#000000" stopOpacity={0} />
+        <linearGradient id="panelBgLive" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#020617" stopOpacity={0.6} />
+          <stop offset="100%" stopColor="#020617" stopOpacity={0.35} />
         </linearGradient>
-        <linearGradient id="bottomFade" x1="0" y1="1" x2="0" y2="0">
-          <stop offset="0%" stopColor="#000000" stopOpacity={0.52} />
-          <stop offset="55%" stopColor="#000000" stopOpacity={0} />
+
+        {/* گرادیانت و سایه لوگوی Base */}
+        <linearGradient id="baseCubeGradLive" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0%" stopColor="#38BDF8" />
+          <stop offset="40%" stopColor="#0EA5E9" />
+          <stop offset="100%" stopColor="#0369A1" />
         </linearGradient>
-        <linearGradient id="leftRail" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#38BDF8" stopOpacity={0} />
-          <stop offset="18%" stopColor="#38BDF8" stopOpacity={0.9} />
-          <stop offset="82%" stopColor="#38BDF8" stopOpacity={0.9} />
-          <stop offset="100%" stopColor="#38BDF8" stopOpacity={0} />
+        <linearGradient id="baseCubeHighlightLive" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor="#E0F2FE" />
+          <stop offset="100%" stopColor="#0EA5E9" />
         </linearGradient>
+        <filter id="softShadowLive" x="-50%" y="-50%" width="200%" height="200%">
+          <feDropShadow
+            dx={0}
+            dy={4}
+            stdDeviation={6}
+            floodColor="#0F172A"
+            floodOpacity={0.45}
+          />
+        </filter>
       </defs>
 
-      {/* top / bottom fades */}
-      <rect width={1024} height={260} fill="url(#topFade)" />
-      <rect y={764} width={1024} height={260} fill="url(#bottomFade)" />
+      {/* مربع آبی بالا راست */}
+      <g filter="url(#softShadowLive)">
+        <rect x={888} y={80} width={56} height={56} rx={18} ry={18} fill="url(#baseCubeGradLive)" />
+        <rect
+          x={888}
+          y={80}
+          width={56}
+          height={28}
+          rx={18}
+          ry={18}
+          fill="url(#baseCubeHighlightLive)"
+          fillOpacity={0.55}
+        />
+      </g>
 
-      {/* ریل عمودی سمت چپ */}
+      {/* پنل شیشه‌ای پایین، هم‌عرض و هم‌مرکز با فریم کیف */}
       <rect
-        x={lineX - 2}
-        y={lineY1}
-        width={4}
-        height={lineY2 - lineY1}
-        fill="#020617"
-        fillOpacity={0.9}
-      />
-      <rect
-        x={lineX}
-        y={lineY1}
-        width={2}
-        height={lineY2 - lineY1}
-        fill="url(#leftRail)"
+        x={commonX}
+        y={panelY}
+        width={commonWidth}
+        height={panelH}
+        rx={24}
+        ry={24}
+        fill="url(#panelBgLive)"
+        stroke="#38BDF8"
+        strokeWidth={1.5}
+        strokeOpacity={0.35}
       />
 
-      {/* مربع آبی Base بالا راست */}
-      <rect x={924} y={32} width={64} height={64} rx={16} ry={16} fill="#0052ff" />
-
+      {/* عنوان */}
       {title && (
         <text
-          x={120}
-          y={120}
-          fill="#ffffff"
+          x={padLeft}
+          y={60}
+          fill="#F9FAFB"
           style={{
             fontFamily:
-              "system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
-            fontSize: 40,
+              "Space Grotesk,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
+            fontSize: 34,
             fontWeight: 800,
           }}
         >
@@ -414,26 +391,44 @@ function LiveOverlay({
         </text>
       )}
 
+      {/* فریم کیف دوخطی و هم‌استایل */}
       {addressStr && (
-        <g opacity={0.95}>
+        <g opacity={0.96}>
           <rect
-            x={120}
-            y={134}
-            rx={999}
-            ry={999}
-            width={280}
-            height={40}
-            fill="#020617"
-            fillOpacity={0.75}
+            x={commonX}
+            y={72}
+            rx={18}
+            ry={18}
+            width={commonWidth}
+            height={68}
+            fill="url(#panelBgLive)"
+            stroke="#38BDF8"
+            strokeWidth={1.2}
+            strokeOpacity={0.45}
           />
           <text
-            x={142}
-            y={161}
-            fill="#E5E7EB"
+            x={textX}
+            y={98}
+            fill="#93C5FD"
             style={{
               fontFamily:
-                "system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
-              fontSize: 20,
+                "Space Grotesk,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
+              fontSize: 15,
+              fontWeight: 600,
+              letterSpacing: '0.18em',
+            }}
+          >
+            MY BASE WALLET
+          </text>
+          <text
+            x={textX}
+            y={124}
+            fill="#22D3EE"
+            style={{
+              fontFamily:
+                "Space Grotesk,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
+              fontSize: 22,
+              fontWeight: 700,
             }}
           >
             {addressStr}
@@ -441,11 +436,57 @@ function LiveOverlay({
         </g>
       )}
 
-      {rows}
+      {/* ردیف‌های استت با فاصله بیشتر و Rank رنگ متفاوت */}
+      {rowsArr.map((s, i) => {
+        const yLabel = statsTop + rowGap * i;
+        const yValue = yLabel + 26;
+        const rawLabel = (s?.label || '').toString();
+        const label = rawLabel.toUpperCase();
+        const value = (s?.value || '').toString();
+        const isRank = rawLabel.trim().toLowerCase() === 'rank';
+        const valueColor = isRank ? '#FACC15' : '#22D3EE';
+
+        return (
+          <g key={i}>
+            <text
+              x={textX}
+              y={yLabel}
+              fill="#93C5FD"
+              style={{
+                fontFamily:
+                  "Space Grotesk,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
+                fontSize: 15,
+                fontWeight: 600,
+                letterSpacing: '0.18em',
+              }}
+            >
+              {label}
+            </text>
+            <text
+              x={textX}
+              y={yValue}
+              fill={valueColor}
+              stroke="#020617"
+              strokeWidth={0.6}
+              style={{
+                fontFamily:
+                  "Space Grotesk,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
+                fontSize: 32,
+                fontWeight: 800,
+                paintOrder: 'stroke',
+                fontVariantNumeric: 'tabular-nums',
+              }}
+            >
+              {value}
+            </text>
+          </g>
+        );
+      })}
     </svg>
   );
 }
 
+// ---------- main component ----------
 export default function CardPreviewMint({
   defaultPrompt,
   title = '',
@@ -516,7 +557,7 @@ export default function CardPreviewMint({
           overlay = [
             {
               label: 'Rank',
-              value: V.rank ? `#${V.rank.toLocaleString()}` : '—',
+              value: V.rank ? V.rank.toLocaleString() : '—', // بدون #
             },
             {
               label: 'Active Months',
@@ -579,7 +620,7 @@ export default function CardPreviewMint({
           overlay = [
             {
               label: 'Rank',
-              value: rank ? `#${Number(rank).toLocaleString()}` : '—',
+              value: rank ? Number(rank).toLocaleString() : '—',
             },
             {
               label: 'Active Months',
@@ -619,13 +660,16 @@ export default function CardPreviewMint({
     }
 
     load();
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+    };
   }, [effectiveAddress]);
 
   // اول متریک‌های خودمون، بعد اگر نبود، props.stats
   const statsToUse: Stat[] =
-    (metricsStats && metricsStats.length > 0) ? metricsStats :
-    (stats && stats.length > 0 ? stats : []);
+    (metricsStats && metricsStats.length > 0)
+      ? metricsStats
+      : (stats && stats.length > 0 ? stats : []);
 
   // On-chain reads
   const { data: mintFeeWei } = useReadContract({
@@ -685,28 +729,33 @@ export default function CardPreviewMint({
     };
     load();
     const id = setInterval(load, 60_000);
-    return () => { alive = false; clearInterval(id); };
+    return () => {
+      alive = false;
+      clearInterval(id);
+    };
   }, []);
 
   const preview = cardImg || baseImg || placeholderSrc;
 
   const mintFeeEth = fmtEth(mintFeeWei);
-  const genFeeEth  = fmtEth(genFeeWei);
-  const genFeeUsd  = (ethUsd != null && genFeeWei != null)
+  const genFeeEth = fmtEth(genFeeWei);
+  const genFeeUsd = (ethUsd != null && genFeeWei != null)
     ? Number(formatEther(toBigIntSafe(genFeeWei))) * ethUsd
     : null;
 
   const cap = toNumberSafe(gateCap, 2);
   const rem = toNumberSafe(gateRemain, cap);
   const used = Math.max(0, cap - rem);
-  const pct  = Math.max(0, Math.min(100, Math.round((used / (cap || 1)) * 100)));
+  const pct = Math.max(0, Math.min(100, Math.round((used / (cap || 1)) * 100)));
   const quotaStr = `${used}/${cap} today`;
 
   async function parseJsonOrText(r: Response) {
     const ct = r.headers.get('content-type') || '';
     const text = await r.text();
     if (ct.includes('application/json')) {
-      try { return JSON.parse(text); } catch {}
+      try {
+        return JSON.parse(text);
+      } catch {}
     }
     throw new Error(`API ${r.status} ${ct}: ${text.slice(0, 180)}`);
   }
@@ -804,7 +853,7 @@ export default function CardPreviewMint({
     try {
       const svg = buildOverlaySVG(
         title,
-        subtitle || (effectiveAddress ? `${effectiveAddress.slice(0,6)}…${effectiveAddress.slice(-4)}` : ''),
+        subtitle || (effectiveAddress ? `${effectiveAddress.slice(0, 6)}…${effectiveAddress.slice(-4)}` : ''),
         statsToUse,
         logoHref,
       );
@@ -851,7 +900,7 @@ export default function CardPreviewMint({
       const deadline = Math.floor(Date.now() / 1000) + 3600;
       const nonce = Number(nextNonce || 0);
 
-      let imageHash = composedHash;
+      let imageHash = cardHash;
       if (!imageHash && composedImg.startsWith('data:')) {
         imageHash = keccak256(dataUrlBytes(composedImg));
       }
@@ -886,39 +935,84 @@ export default function CardPreviewMint({
     }
   }
 
-  const Frame: React.FC<{ title: string; value: React.ReactNode; canButton?: boolean; onClick?: ()=>void }> = ({ title, value, canButton, onClick }) => (
+  const Frame: React.FC<{ title: string; value: React.ReactNode; canButton?: boolean; onClick?: () => void }> = ({
+    title,
+    value,
+    canButton,
+    onClick,
+  }) =>
     canButton ? (
-      <button onClick={onClick}
+      <button
+        onClick={onClick}
         style={{
-          padding:'10px 12px', borderRadius:12, border:'1px solid rgba(0,0,0,.08)',
-          background:'linear-gradient(135deg,#64748b,#0ea5e9)', color:'#fff',
-          fontWeight:800, boxShadow:'0 2px 8px rgba(0,0,0,.08)'
-        }}>
+          padding: '10px 12px',
+          borderRadius: 12,
+          border: '1px solid rgba(0,0,0,.08)',
+          background: 'linear-gradient(135deg,#64748b,#0ea5e9)',
+          color: '#fff',
+          fontWeight: 800,
+          boxShadow: '0 2px 8px rgba(0,0,0,.08)',
+        }}
+      >
         Download
       </button>
     ) : (
-      <div style={{
-        padding:'10px 12px', border:'1px solid rgba(0,0,0,.08)', borderRadius:12,
-        background:'#fff', boxShadow:'0 2px 8px rgba(0,0,0,.04)', display:'flex',
-        flexDirection:'column', gap:6, minHeight:56, justifyContent:'center'
-      }}>
-        <div style={{fontSize:12, opacity:.7, fontWeight:600}}>{title}</div>
-        <div style={{fontSize:14, fontWeight:800}}>{value}</div>
+      <div
+        style={{
+          padding: '10px 12px',
+          border: '1px solid rgba(0,0,0,.08)',
+          borderRadius: 12,
+          background: '#fff',
+          boxShadow: '0 2px 8px rgba(0,0,0,.04)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 6,
+          minHeight: 56,
+          justifyContent: 'center',
+        }}
+      >
+        <div style={{ fontSize: 12, opacity: 0.7, fontWeight: 600 }}>{title}</div>
+        <div style={{ fontSize: 14, fontWeight: 800 }}>{value}</div>
       </div>
-    )
-  );
+    );
 
   const anyBusy = busy.paying || busy.gen || busy.compose || busy.mint;
-  const busyText = busy.paying ? 'Paying…' : busy.gen ? 'Generating…' : busy.compose ? 'Composing…' : busy.mint ? 'Minting…' : '';
+  const busyText = busy.paying
+    ? 'Paying…'
+    : busy.gen
+    ? 'Generating…'
+    : busy.compose
+    ? 'Composing…'
+    : busy.mint
+    ? 'Minting…'
+    : '';
 
   return (
     <div className="grid gap-3">
       {/* Buttons */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(2, minmax(0, 1fr))', gap: 10, alignItems:'center' }}>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+          gap: 10,
+          alignItems: 'center',
+        }}
+      >
         <button
           onClick={handleGenerate}
-          disabled={!!busy.gen || !!busy.paying || (!!GATE && gateRemain!==undefined && toNumberSafe(gateRemain)===0)}
-          style={{ ...btn('linear-gradient(135deg,#7c3aed,#2563eb)'), ...((busy.gen||busy.paying||((!!GATE) && gateRemain!==undefined && toNumberSafe(gateRemain)===0))?btnDisabled:{}) }}
+          disabled={
+            !!busy.gen ||
+            !!busy.paying ||
+            (!!GATE && gateRemain !== undefined && toNumberSafe(gateRemain) === 0)
+          }
+          style={{
+            ...btn('linear-gradient(135deg,#7c3aed,#2563eb)'),
+            ...((busy.gen ||
+              busy.paying ||
+              ((!!GATE) && gateRemain !== undefined && toNumberSafe(gateRemain) === 0))
+              ? btnDisabled
+              : {}),
+          }}
           title={GATE ? 'Pay & Generate' : 'Generate'}
         >
           {busy.paying ? 'Paying…' : 'Generate'}
@@ -926,7 +1020,10 @@ export default function CardPreviewMint({
         <button
           onClick={handleComposeAndMint}
           disabled={!baseImg || !!busy.compose || !!busy.mint}
-          style={{ ...btn('linear-gradient(135deg,#10b981,#059669)'), ...(!baseImg||busy.compose||busy.mint?btnDisabled:{}) }}
+          style={{
+            ...btn('linear-gradient(135deg,#10b981,#059669)'),
+            ...(!baseImg || busy.compose || busy.mint ? btnDisabled : {}),
+          }}
           title="Compose & Mint"
         >
           {busy.compose || busy.mint ? 'Processing…' : 'Mint'}
@@ -934,35 +1031,89 @@ export default function CardPreviewMint({
       </div>
 
       {/* Frames row: Generate | Mint | Quota | Download */}
-      <div style={{display:'grid', gridTemplateColumns:'repeat(4, minmax(0,1fr))', gap:10, margin:'6px 0 4px'}}>
-        <Frame title="Generate" value={<>{genFeeEth || '—'} ETH{genFeeUsd!=null && <> (≈ ${genFeeUsd.toFixed(2)})</>}</>} />
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(4, minmax(0,1fr))',
+          gap: 10,
+          margin: '6px 0 4px',
+        }}
+      >
+        <Frame
+          title="Generate"
+          value={
+            <>
+              {genFeeEth || '—'} ETH
+              {genFeeUsd != null && <> (≈ ${genFeeUsd.toFixed(2)})</>}
+            </>
+          }
+        />
         <Frame title="Mint" value={<>{mintFeeEth || '—'} ETH</>} />
         <Frame title="Quota" value={quotaStr} />
-        {mintTx && cardImg
-          ? <Frame title="Download" value="" canButton onClick={()=>downloadFile(cardImg!, 'persona_card.png')} />
-          : <Frame title="Download" value="—" />}
+        {mintTx && cardImg ? (
+          <Frame
+            title="Download"
+            value=""
+            canButton
+            onClick={() => downloadFile(cardImg!, 'persona_card.png')}
+          />
+        ) : (
+          <Frame title="Download" value="—" />
+        )}
       </div>
 
       {/* Daily usage progress */}
-      <div style={{display:'flex', alignItems:'center', gap:10}}>
-        <div style={{display:'flex', alignItems:'center', gap:10, width:'100%', maxWidth:520}}>
-          <div style={{flex:1, height:8, borderRadius:8, background:'rgba(0,0,0,.08)', overflow:'hidden'}}>
-            <div style={{width: `${pct}%`, height:'100%', background:'linear-gradient(90deg,#60a5fa,#a78bfa)', transition:'width .3s'}}/>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', maxWidth: 520 }}>
+          <div
+            style={{
+              flex: 1,
+              height: 8,
+              borderRadius: 8,
+              background: 'rgba(0,0,0,.08)',
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                width: `${pct}%`,
+                height: '100%',
+                background: 'linear-gradient(90deg,#60a5fa,#a78bfa)',
+                transition: 'width .3s',
+              }}
+            />
           </div>
-          <div style={{fontSize:12, opacity:.75, minWidth:80, textAlign:'right'}}>{quotaStr}</div>
+          <div style={{ fontSize: 12, opacity: 0.75, minWidth: 80, textAlign: 'right' }}>{quotaStr}</div>
         </div>
       </div>
 
-      {error && <div style={{color:'crimson', whiteSpace:'pre-wrap'}}>{error}</div>}
+      {error && <div style={{ color: 'crimson', whiteSpace: 'pre-wrap' }}>{error}</div>}
 
       {/* Preview */}
-      <div style={{ width:'100%', maxWidth:520, aspectRatio:'1 / 1', borderRadius:20, border:'1px solid rgba(0,0,0,0.08)', overflow:'hidden', position:'relative' }}>
-        <img src={preview} alt="preview" style={{ width:'100%', height:'100%', objectFit:'cover', display:'block' }} />
+      <div
+        style={{
+          width: '100%',
+          maxWidth: 520,
+          aspectRatio: '1 / 1',
+          borderRadius: 20,
+          border: '1px solid rgba(0,0,0,0.08)',
+          overflow: 'hidden',
+          position: 'relative',
+        }}
+      >
+        <img
+          src={preview}
+          alt="preview"
+          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+        />
         {!cardImg && (
-          <div style={{ position:'absolute', inset:0, pointerEvents:'none' }}>
+          <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
             <LiveOverlay
               title={title}
-              addressStr={subtitle || (effectiveAddress ? `${effectiveAddress.slice(0,6)}…${effectiveAddress.slice(-4)}` : '')}
+              addressStr={
+                subtitle ||
+                (effectiveAddress ? `${effectiveAddress.slice(0, 6)}…${effectiveAddress.slice(-4)}` : '')
+              }
               stats={statsToUse}
               badgeText={badgeText}
               logoHref={logoHref}
@@ -972,28 +1123,76 @@ export default function CardPreviewMint({
 
         {/* Busy overlay loader */}
         {anyBusy && (
-          <div style={{
-            position:'absolute', inset:0, background:'rgba(15,23,42,.45)',
-            display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', gap:14, color:'#fff'
-          }}>
-            <div style={{
-              width:48, height:48, borderRadius:'50%',
-              border:'4px solid rgba(255,255,255,.25)',
-              borderTopColor:'#fff', animation:'spin 1s linear infinite'
-            }} />
-            <div style={{fontWeight:800}}>{busyText}</div>
-            <style jsx>{`@keyframes spin {to {transform: rotate(360deg);}}`}</style>
-            <div style={{width:'70%', height:6, borderRadius:6, background:'rgba(255,255,255,.25)', overflow:'hidden'}}>
-              <div style={{width:'60%', height:'100%', borderRadius:6, background:'#fff', animation:'bar 1.5s ease-in-out infinite'}} />
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              background: 'rgba(15,23,42,.45)',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 14,
+              color: '#fff',
+            }}
+          >
+            <div
+              style={{
+                width: 48,
+                height: 48,
+                borderRadius: '50%',
+                border: '4px solid rgba(255,255,255,.25)',
+                borderTopColor: '#fff',
+                animation: 'spin 1s linear infinite',
+              }}
+            />
+            <div style={{ fontWeight: 800 }}>{busyText}</div>
+            <style jsx>{`
+              @keyframes spin {
+                to {
+                  transform: rotate(360deg);
+                }
+              }
+            `}</style>
+            <div
+              style={{
+                width: '70%',
+                height: 6,
+                borderRadius: 6,
+                background: 'rgba(255,255,255,.25)',
+                overflow: 'hidden',
+              }}
+            >
+              <div
+                style={{
+                  width: '60%',
+                  height: '100%',
+                  borderRadius: 6,
+                  background: '#fff',
+                  animation: 'bar 1.5s ease-in-out infinite',
+                }}
+              />
             </div>
-            <style jsx>{`@keyframes bar { 0%{transform:translateX(-60%)} 50%{transform:translateX(20%)} 100%{transform:translateX(120%)} }`}</style>
-            <div style={{fontSize:12, opacity:.9}}>Don’t refresh. This can take a few seconds.</div>
+            <style jsx>{`
+              @keyframes bar {
+                0% {
+                  transform: translateX(-60%);
+                }
+                50% {
+                  transform: translateX(20%);
+                }
+                100% {
+                  transform: translateX(120%);
+                }
+              }
+            `}</style>
+            <div style={{ fontSize: 12, opacity: 0.9 }}>Don’t refresh. This can take a few seconds.</div>
           </div>
         )}
       </div>
 
       {/* After mint badge */}
-      {mintTx && <div className="badge">Mint tx: {mintTx.slice(0,10)}…</div>}
+      {mintTx && <div className="badge">Mint tx: {mintTx.slice(0, 10)}…</div>}
     </div>
   );
 }
