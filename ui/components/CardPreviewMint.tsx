@@ -119,8 +119,9 @@ function escapeAddress(s: string): string {
 }
 
 /**
- * Layout: گیم‌طور
- * - فریم کیف و پنل شیشه‌ای دقیقاً هم‌عرض، پنل شیشه‌ای هم‌مرکز با کیف
+ * Layout:
+ * - فریم کیف بالا و فریم شیشه‌ای پایین، دقیقاً هم‌عرض و هم‌تراز
+ * - فریم شیشه‌ای ۱۰٪ باریک‌تر از عرض پایه و هر دو از یک عرض استفاده می‌کنند
  * - بدون خط عمودی
  * - RANK رنگ متفاوت
  * - فریم کیف دوخطی (MY WALLET + آدرس)
@@ -141,14 +142,14 @@ function buildOverlaySVG(
     }));
 
   const padLeft = 44;
+  const frameBaseWidth = 320;                     // عرض پایه
   const frameX = padLeft - 6;
-  const frameWidthFull = 320; // عرض پایه
-  const commonWidth = Math.round(frameWidthFull * 0.9); // عرض نهایی (۱۰٪ کمتر)
-  const commonX = frameX + (frameWidthFull - commonWidth) / 2; // وسط فریم پایه
-  const textX = commonX + 22;
+  const statsWidth = Math.round(frameBaseWidth * 0.9); // ۱۰٪ باریک‌تر
+  const sharedWidth = statsWidth;                // عرض مشترک فریم بالا و پایین
+  const sharedX = frameX + (frameBaseWidth - sharedWidth) / 2; // X مشترک
 
-  const statsTop = 620; // استت‌ها پایین
-  const rowGap = 60; // فاصله زیاد بین ردیف‌ها
+  const statsTop = 620;
+  const rowGap = 60;
   const n = safeStats.length || 1;
 
   const panelY = statsTop - 90;
@@ -160,18 +161,18 @@ function buildOverlaySVG(
   const rows = safeStats
     .map((row, i) => {
       const yLabel = statsTop + rowGap * i;
-      const yValue = yLabel + 26; // فاصله بیشتر برای عدد بزرگ‌تر
+      const yValue = yLabel + 26;
 
       const rawLabel = row.label || '';
       const label = escapeXml(rawLabel.toUpperCase());
       const value = escapeXml(row.value);
       const isRank = rawLabel.trim().toLowerCase() === 'rank';
-      const valueColor = isRank ? '#FACC15' : '#22D3EE'; // Rank طلایی‌نئون
+      const valueColor = isRank ? '#FACC15' : '#22D3EE';
 
       return `
       <g>
         <text
-          x="${textX}"
+          x="${padLeft + 22}"
           y="${yLabel}"
           fill="#93C5FD"
           font-size="15"
@@ -181,7 +182,7 @@ function buildOverlaySVG(
           ${label}
         </text>
         <text
-          x="${textX}"
+          x="${padLeft + 22}"
           y="${yValue}"
           fill="${valueColor}"
           stroke="#020617"
@@ -212,19 +213,19 @@ function buildOverlaySVG(
   const addrBlock = addrSafe
     ? `
     <g opacity="0.96">
-      <rect x="${commonX}" y="72" rx="18" ry="18" width="${commonWidth}" height="68"
-            fill="url(#panelBg)"
-            stroke="#38BDF8" stroke-width="1.2" stroke-opacity="0.45" />
-      <text x="${textX}" y="98"
-            fill="#93C5FD"
+      <rect x="${sharedX}" y="72" rx="18" ry="18" width="${sharedWidth}" height="68"
+            fill="#020617" fill-opacity="0.8"
+            stroke="#38BDF8" stroke-width="1.2" stroke-opacity="0.55" />
+      <text x="${padLeft + 22}" y="98"
+            fill="#F9FAFB"
             font-size="15"
             font-weight="600"
             letter-spacing="0.18em"
             font-family="Space Grotesk,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
         MY WALLET
       </text>
-      <text x="${textX}" y="124"
-            fill="#22D3EE"
+      <text x="${padLeft + 22}" y="124"
+            fill="#38BDF8"
             font-size="22"
             font-weight="700"
             font-family="Space Grotesk,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
@@ -267,8 +268,8 @@ function buildOverlaySVG(
           fill="url(#baseCubeHighlight)" fill-opacity="0.55" />
   </g>
 
-  <!-- پنل شیشه‌ای برای استت‌ها (هم‌عرض فریم کیف) -->
-  <rect x="${commonX}" y="${panelY}" width="${commonWidth}" height="${panelH}"
+  <!-- پنل شیشه‌ای برای استت‌ها (۱۰٪ باریک‌تر و هم‌عرض فریم کیف) -->
+  <rect x="${sharedX}" y="${panelY}" width="${sharedWidth}" height="${panelH}"
         rx="24" ry="24"
         fill="url(#panelBg)"
         stroke="#38BDF8"
@@ -303,11 +304,11 @@ function LiveOverlay({
   const rowsArr = safeStats.slice(0, maxRows);
 
   const padLeft = 44;
+  const frameBaseWidth = 320;
   const frameX = padLeft - 6;
-  const frameWidthFull = 320;
-  const commonWidth = Math.round(frameWidthFull * 0.9);
-  const commonX = frameX + (frameWidthFull - commonWidth) / 2;
-  const textX = commonX + 22;
+  const statsWidth = Math.round(frameBaseWidth * 0.9);
+  const sharedWidth = statsWidth;
+  const sharedX = frameX + (frameBaseWidth - sharedWidth) / 2;
 
   const statsTop = 620;
   const rowGap = 60;
@@ -360,11 +361,11 @@ function LiveOverlay({
         />
       </g>
 
-      {/* پنل شیشه‌ای پایین، هم‌عرض و هم‌مرکز با فریم کیف */}
+      {/* پنل شیشه‌ای پایین، ۱۰٪ باریک‌تر و هم‌عرض فریم کیف */}
       <rect
-        x={commonX}
+        x={sharedX}
         y={panelY}
-        width={commonWidth}
+        width={sharedWidth}
         height={panelH}
         rx={24}
         ry={24}
@@ -391,25 +392,26 @@ function LiveOverlay({
         </text>
       )}
 
-      {/* فریم کیف دوخطی و هم‌استایل */}
+      {/* فریم کیف دوخطی و هم‌عرض با پایین */}
       {addressStr && (
         <g opacity={0.96}>
           <rect
-            x={commonX}
+            x={sharedX}
             y={72}
             rx={18}
             ry={18}
-            width={commonWidth}
+            width={sharedWidth}
             height={68}
-            fill="url(#panelBgLive)"
+            fill="#020617"
+            fillOpacity={0.8}
             stroke="#38BDF8"
             strokeWidth={1.2}
-            strokeOpacity={0.45}
+            strokeOpacity={0.55}
           />
           <text
-            x={textX}
+            x={padLeft + 22}
             y={98}
-            fill="#93C5FD"
+            fill="#F9FAFB"
             style={{
               fontFamily:
                 "Space Grotesk,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
@@ -418,12 +420,12 @@ function LiveOverlay({
               letterSpacing: '0.18em',
             }}
           >
-            MY BASE WALLET
+            MY WALLET
           </text>
           <text
-            x={textX}
+            x={padLeft + 22}
             y={124}
-            fill="#22D3EE"
+            fill="#38BDF8"
             style={{
               fontFamily:
                 "Space Grotesk,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
@@ -449,7 +451,7 @@ function LiveOverlay({
         return (
           <g key={i}>
             <text
-              x={textX}
+              x={padLeft + 22}
               y={yLabel}
               fill="#93C5FD"
               style={{
@@ -463,7 +465,7 @@ function LiveOverlay({
               {label}
             </text>
             <text
-              x={textX}
+              x={padLeft + 22}
               y={yValue}
               fill={valueColor}
               stroke="#020617"
@@ -528,21 +530,24 @@ export default function CardPreviewMint({
 
         // ---- حالت ۱: ساختار /api/metrics → { summary, monthly } ----
         const monthlyA: any[] =
-          Array.isArray(data.monthly) ? data.monthly :
-          Array.isArray(data.metrics?.monthly) ? data.metrics.monthly :
-          [];
+          Array.isArray(data.monthly)
+            ? data.monthly
+            : Array.isArray(data.metrics?.monthly)
+            ? data.metrics.monthly
+            : [];
 
         if (monthlyA.length > 0) {
-          const sBal  = monthlyA.map(m => Number(m.avg_balance_eth ?? m.balance_eth ?? 0));
-          const sTxs  = monthlyA.map(m => Number(m.native_txs ?? m.txs ?? 0));
-          const sUniq = monthlyA.map(m => Number(m.uniq_contracts ?? m.uniq ?? 0));
-          const sDays = monthlyA.map(m => Number(m.uniq_days ?? m.days ?? 0));
-          const sRank = monthlyA.map(m => Number(m.ranks?.overall?.rank ?? m.rank_m ?? 0));
+          const sBal = monthlyA.map((m) => Number(m.avg_balance_eth ?? m.balance_eth ?? 0));
+          const sTxs = monthlyA.map((m) => Number(m.native_txs ?? m.txs ?? 0));
+          const sUniq = monthlyA.map((m) => Number(m.uniq_contracts ?? m.uniq ?? 0));
+          const sDays = monthlyA.map((m) => Number(m.uniq_days ?? m.days ?? 0));
+          const sRank = monthlyA.map((m) => Number(m.ranks?.overall?.rank ?? m.rank_m ?? 0));
 
-          const activeMonths = monthlyA.filter(m =>
-            Number(m.native_txs ?? m.txs ?? 0) > 0 ||
-            Number(m.uniq_days ?? m.days ?? 0) > 0 ||
-            Number(m.uniq_contracts ?? m.uniq ?? 0) > 0,
+          const activeMonths = monthlyA.filter(
+            (m) =>
+              Number(m.native_txs ?? m.txs ?? 0) > 0 ||
+              Number(m.uniq_days ?? m.days ?? 0) > 0 ||
+              Number(m.uniq_contracts ?? m.uniq ?? 0) > 0,
           ).length;
 
           const V = {
@@ -551,7 +556,7 @@ export default function CardPreviewMint({
             uniq: sum(sUniq),
             days: sum(sDays),
             months: activeMonths,
-            rank: (sRank.filter(x => x > 0).length ? Math.min(...sRank.filter(x => x > 0)) : 0),
+            rank: sRank.filter((x) => x > 0).length ? Math.min(...sRank.filter((x) => x > 0)) : 0,
           };
 
           overlay = [
@@ -587,12 +592,7 @@ export default function CardPreviewMint({
           const monthsObj = root.months || {};
           const monthsArr = Object.values(monthsObj) as any[];
 
-          const rank =
-            root.rank ??
-            lifetime.rank ??
-            root.rank_lt ??
-            root.composite_rank_lt ??
-            0;
+          const rank = root.rank ?? lifetime.rank ?? root.rank_lt ?? root.composite_rank_lt ?? 0;
 
           const txSum =
             lifetime.tx_sum ??
@@ -602,13 +602,13 @@ export default function CardPreviewMint({
             lifetime.uniq_sum ??
             monthsArr.reduce((acc, m) => acc + Number(m.uniq || 0), 0);
 
-          const daysSum =
-            monthsArr.reduce((acc, m) => acc + Number(m.days || 0), 0);
+          const daysSum = monthsArr.reduce((acc, m) => acc + Number(m.days || 0), 0);
 
-          const activeMonths = monthsArr.filter(m =>
-            Number(m.txs || 0) > 0 ||
-            Number(m.days || 0) > 0 ||
-            Number(m.uniq || 0) > 0,
+          const activeMonths = monthsArr.filter(
+            (m) =>
+              Number(m.txs || 0) > 0 ||
+              Number(m.days || 0) > 0 ||
+              Number(m.uniq || 0) > 0,
           ).length;
 
           const balanceMean =
@@ -667,9 +667,11 @@ export default function CardPreviewMint({
 
   // اول متریک‌های خودمون، بعد اگر نبود، props.stats
   const statsToUse: Stat[] =
-    (metricsStats && metricsStats.length > 0)
+    metricsStats && metricsStats.length > 0
       ? metricsStats
-      : (stats && stats.length > 0 ? stats : []);
+      : stats && stats.length > 0
+      ? stats
+      : [];
 
   // On-chain reads
   const { data: mintFeeWei } = useReadContract({
@@ -682,7 +684,7 @@ export default function CardPreviewMint({
     address: CONTRACT,
     abi: bmImage721Abi as any,
     functionName: 'nonces',
-    args: [((connected as any) || '0x0000000000000000000000000000000000000000')],
+    args: [(connected as any) || '0x0000000000000000000000000000000000000000'],
     query: { enabled: Boolean(CONTRACT && connected) },
   });
 
@@ -703,7 +705,7 @@ export default function CardPreviewMint({
     address: GATE || undefined,
     abi: gateAbi as any,
     functionName: 'remainingToday',
-    args: [((connected as any) || '0x0000000000000000000000000000000000000000')],
+    args: [(connected as any) || '0x0000000000000000000000000000000000000000'],
     query: { enabled: Boolean(GATE && connected) },
   });
 
@@ -723,7 +725,7 @@ export default function CardPreviewMint({
     let alive = true;
     const load = async () => {
       try {
-        const j = await fetch('/api/eth-usd').then(r => r.json());
+        const j = await fetch('/api/eth-usd').then((r) => r.json());
         if (alive && j?.ok && typeof j.usd === 'number') setEthUsd(j.usd);
       } catch {}
     };
@@ -739,9 +741,10 @@ export default function CardPreviewMint({
 
   const mintFeeEth = fmtEth(mintFeeWei);
   const genFeeEth = fmtEth(genFeeWei);
-  const genFeeUsd = (ethUsd != null && genFeeWei != null)
-    ? Number(formatEther(toBigIntSafe(genFeeWei))) * ethUsd
-    : null;
+  const genFeeUsd =
+    ethUsd != null && genFeeWei != null
+      ? Number(formatEther(toBigIntSafe(genFeeWei))) * ethUsd
+      : null;
 
   const cap = toNumberSafe(gateCap, 2);
   const rem = toNumberSafe(gateRemain, cap);
@@ -785,7 +788,7 @@ export default function CardPreviewMint({
 
     let payHash: string | null = null;
     if (GATE && genFeeWei != null) {
-      setBusy(b => ({ ...b, paying: true }));
+      setBusy((b) => ({ ...b, paying: true }));
       try {
         const txHash = await writeContractAsync({
           address: GATE,
@@ -797,14 +800,14 @@ export default function CardPreviewMint({
         payHash = String(txHash);
         setPayTx(payHash);
       } catch (e: any) {
-        setBusy(b => ({ ...b, paying: false }));
+        setBusy((b) => ({ ...b, paying: false }));
         setError(String(e?.message || e));
         return;
       }
-      setBusy(b => ({ ...b, paying: false }));
+      setBusy((b) => ({ ...b, paying: false }));
     }
 
-    setBusy(b => ({ ...b, gen: true }));
+    setBusy((b) => ({ ...b, gen: true }));
     try {
       const r = await fetch('/api/generate', {
         method: 'POST',
@@ -827,7 +830,7 @@ export default function CardPreviewMint({
     } catch (e: any) {
       setError(String(e?.message || e));
     } finally {
-      setBusy(b => ({ ...b, gen: false }));
+      setBusy((b) => ({ ...b, gen: false }));
     }
   }
 
@@ -845,7 +848,7 @@ export default function CardPreviewMint({
     }
 
     // 1) Compose / store
-    setBusy(b => ({ ...b, compose: true }));
+    setBusy((b) => ({ ...b, compose: true }));
     let composedImg: string | null = null;
     let composedHash: string | null = null;
     let composedTokenUri: string | null = null;
@@ -853,11 +856,11 @@ export default function CardPreviewMint({
     try {
       const svg = buildOverlaySVG(
         title,
-        subtitle || (effectiveAddress ? `${effectiveAddress.slice(0, 6)}…${effectiveAddress.slice(-4)}` : ''),
-        statsToUse,
-        logoHref,
+        subtitle ||
+          (effectiveAddress
+            ? `${effectiveAddress.slice(0, 6)}…${effectiveAddress.slice(-4)}`
+            : ''),
       );
-
       const r = await fetch('/api/compose-store', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
@@ -867,8 +870,14 @@ export default function CardPreviewMint({
           overlaySVG: svg,
           name: 'Base Persona Card',
           description: 'Deterministic persona generated from onchain activity.',
-          attributes: (statsToUse || []).map(s => ({ trait_type: s.label, value: s.value })),
-          external_url: window.location.origin + `/nft/${effectiveAddress}`,
+          attributes: (statsToUse || []).map((s) => ({
+            trait_type: s.label,
+            value: s.value,
+          })),
+          external_url:
+            typeof window !== 'undefined'
+              ? window.location.origin + `/nft/${effectiveAddress}`
+              : '',
         }),
       });
       const j = await parseJsonOrText(r);
@@ -883,11 +892,11 @@ export default function CardPreviewMint({
       setTokenUri(composedTokenUri);
       setMintTx(null);
     } catch (e: any) {
-      setBusy(b => ({ ...b, compose: false }));
+      setBusy((b) => ({ ...b, compose: false }));
       setError(String(e?.message || e));
       return;
     }
-    setBusy(b => ({ ...b, compose: false }));
+    setBusy((b) => ({ ...b, compose: false }));
 
     // 2) Mint
     if (!composedImg || !composedTokenUri) {
@@ -895,12 +904,13 @@ export default function CardPreviewMint({
       return;
     }
 
-    setBusy(b => ({ ...b, mint: true }));
+    setBusy((b) => ({ ...b, mint: true }));
     try {
       const deadline = Math.floor(Date.now() / 1000) + 3600;
       const nonce = Number(nextNonce || 0);
 
-      let imageHash = cardHash;
+      // مهم: از composedHash همین تابع استفاده کن، نه state قدیمی
+      let imageHash: string | null = composedHash || cardHash;
       if (!imageHash && composedImg.startsWith('data:')) {
         imageHash = keccak256(dataUrlBytes(composedImg));
       }
@@ -909,7 +919,13 @@ export default function CardPreviewMint({
       const sc = await fetch('/api/sign-claim', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ to: effectiveAddress, tokenURI: composedTokenUri, imageHash, deadline, nonce }),
+        body: JSON.stringify({
+          to: effectiveAddress,
+          tokenURI: composedTokenUri,
+          imageHash,
+          deadline,
+          nonce,
+        }),
       }).then(parseJsonOrText);
       if (!sc?.sig) throw new Error(sc?.error || 'sign_claim_failed');
 
@@ -931,16 +947,16 @@ export default function CardPreviewMint({
     } catch (e: any) {
       setError(String(e?.message || e));
     } finally {
-      setBusy(b => ({ ...b, mint: false }));
+      setBusy((b) => ({ ...b, mint: false }));
     }
   }
 
-  const Frame: React.FC<{ title: string; value: React.ReactNode; canButton?: boolean; onClick?: () => void }> = ({
-    title,
-    value,
-    canButton,
-    onClick,
-  }) =>
+  const Frame: React.FC<{
+    title: string;
+    value: React.ReactNode;
+    canButton?: boolean;
+    onClick?: () => void;
+  }> = ({ title, value, canButton, onClick }) =>
     canButton ? (
       <button
         onClick={onClick}
@@ -1009,7 +1025,7 @@ export default function CardPreviewMint({
             ...btn('linear-gradient(135deg,#7c3aed,#2563eb)'),
             ...((busy.gen ||
               busy.paying ||
-              ((!!GATE) && gateRemain !== undefined && toNumberSafe(gateRemain) === 0))
+              (!!GATE && gateRemain !== undefined && toNumberSafe(gateRemain) === 0))
               ? btnDisabled
               : {}),
           }}
@@ -1034,7 +1050,7 @@ export default function CardPreviewMint({
       <div
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(4, minmax(0,1fr))',
+          gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
           gap: 10,
           margin: '6px 0 4px',
         }}
@@ -1064,7 +1080,15 @@ export default function CardPreviewMint({
 
       {/* Daily usage progress */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', maxWidth: 520 }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            width: '100%',
+            maxWidth: 520,
+          }}
+        >
           <div
             style={{
               flex: 1,
@@ -1083,7 +1107,16 @@ export default function CardPreviewMint({
               }}
             />
           </div>
-          <div style={{ fontSize: 12, opacity: 0.75, minWidth: 80, textAlign: 'right' }}>{quotaStr}</div>
+          <div
+            style={{
+              fontSize: 12,
+              opacity: 0.75,
+              minWidth: 80,
+              textAlign: 'right',
+            }}
+          >
+            {quotaStr}
+          </div>
         </div>
       </div>
 
@@ -1112,7 +1145,9 @@ export default function CardPreviewMint({
               title={title}
               addressStr={
                 subtitle ||
-                (effectiveAddress ? `${effectiveAddress.slice(0, 6)}…${effectiveAddress.slice(-4)}` : '')
+                (effectiveAddress
+                  ? `${effectiveAddress.slice(0, 6)}…${effectiveAddress.slice(-4)}`
+                  : '')
               }
               stats={statsToUse}
               badgeText={badgeText}
@@ -1186,7 +1221,9 @@ export default function CardPreviewMint({
                 }
               }
             `}</style>
-            <div style={{ fontSize: 12, opacity: 0.9 }}>Don’t refresh. This can take a few seconds.</div>
+            <div style={{ fontSize: 12, opacity: 0.9 }}>
+              Don’t refresh. This can take a few seconds.
+            </div>
           </div>
         )}
       </div>
