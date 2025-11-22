@@ -125,13 +125,13 @@ function escapeAddress(s: string): string {
  * - بدون خط عمودی
  * - RANK رنگ متفاوت
  * - فریم کیف دوخطی (MY WALLET + آدرس)
- * - این نسخه برای رندر روی سرور فقط از فونت‌های generic استفاده می‌کند (sans-serif)
+ * - برای رندر روی سرور فقط از font-family="sans-serif" استفاده می‌کنیم تا توی لینوکس مربع نشه
  */
 function buildOverlaySVG(
   title: string | undefined,
   addressStr: string | undefined,
   statsIn: Stat[] | undefined,
-  _logoHref: string = '/base_logo.svg',
+  logoHref: string = '/base_logo.svg', // فقط برای سازگاری امضاء
 ): string {
   const stats = Array.isArray(statsIn) ? statsIn : [];
   const maxRows = 6;
@@ -443,7 +443,7 @@ function LiveOverlay({
         const yValue = yLabel + 26;
         const rawLabel = (s?.label || '').toString();
         const label = rawLabel.toUpperCase();
-        const value = (s?.value || '').toString();
+        the value = (s?.value || '').toString();
         const isRank = rawLabel.trim().toLowerCase() === 'rank';
         const valueColor = isRank ? '#FACC15' : '#22D3EE';
 
@@ -527,7 +527,6 @@ export default function CardPreviewMint({
 
         let overlay: Stat[] = [];
 
-        // ---- حالت ۱: ساختار /api/metrics → { summary, monthly } ----
         const monthlyA: any[] = Array.isArray(data.monthly)
           ? data.monthly
           : Array.isArray(data.metrics?.monthly)
@@ -560,7 +559,7 @@ export default function CardPreviewMint({
           overlay = [
             {
               label: 'Rank',
-              value: V.rank ? V.rank.toLocaleString() : '—', // بدون #
+              value: V.rank ? V.rank.toLocaleString() : '—',
             },
             {
               label: 'Active Months',
@@ -584,7 +583,6 @@ export default function CardPreviewMint({
             },
           ];
         } else {
-          // ---- حالت ۲: ساختار wallets_FULL → { wallet, rank, lifetime, months:{...} } ----
           const root: any = data.metrics || data;
           const lifetime = root.lifetime || {};
           const monthsObj = root.months || {};
@@ -663,7 +661,6 @@ export default function CardPreviewMint({
     };
   }, [effectiveAddress]);
 
-  // اول متریک‌های خودمون، بعد اگر نبود، props.stats
   const statsToUse: Stat[] =
     metricsStats && metricsStats.length > 0
       ? metricsStats
@@ -671,7 +668,6 @@ export default function CardPreviewMint({
       ? stats
       : [];
 
-  // On-chain reads
   const { data: mintFeeWei } = useReadContract({
     address: CONTRACT,
     abi: bmImage721Abi as any,
@@ -686,7 +682,6 @@ export default function CardPreviewMint({
     query: { enabled: Boolean(CONTRACT && connected) },
   });
 
-  // Gate reads (optional)
   const { data: genFeeWei } = useReadContract({
     address: GATE || undefined,
     abi: gateAbi as any,
@@ -770,7 +765,6 @@ export default function CardPreviewMint({
     a.remove();
   }
 
-  // --- Pay (optional) + Generate via /api/generate ---
   async function handleGenerate() {
     setError(null);
 
@@ -832,7 +826,6 @@ export default function CardPreviewMint({
     }
   }
 
-  // --- Compose + Mint در یک کلیک ---
   async function handleComposeAndMint() {
     setError(null);
 
@@ -845,7 +838,6 @@ export default function CardPreviewMint({
       return;
     }
 
-    // 1) Compose / store
     setBusy((b) => ({ ...b, compose: true }));
     let composedImg: string | null = null;
     let composedHash: string | null = null;
@@ -899,7 +891,6 @@ export default function CardPreviewMint({
     }
     setBusy((b) => ({ ...b, compose: false }));
 
-    // 2) Mint
     if (!composedImg || !composedTokenUri) {
       setError('Missing composed image or tokenURI');
       return;
@@ -910,7 +901,6 @@ export default function CardPreviewMint({
       const deadline = Math.floor(Date.now() / 1000) + 3600;
       const nonce = Number(nextNonce || 0);
 
-      // از هشِ تازه استفاده کن، اگر نبود از state قبلی
       let imageHash: string | null = composedHash || cardHash;
       if (!imageHash && composedImg.startsWith('data:')) {
         imageHash = keccak256(dataUrlBytes(composedImg));
@@ -1103,7 +1093,7 @@ export default function CardPreviewMint({
               style={{
                 width: `${pct}%`,
                 height: '100%',
-                background: 'linear-gradient(90deg,#60a5fa,#a78bfa)`,
+                background: 'linear-gradient(90deg,#60a5fa,#a78bfa)',
                 transition: 'width .3s',
               }}
             />
