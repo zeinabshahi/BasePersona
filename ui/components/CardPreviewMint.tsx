@@ -121,17 +121,16 @@ function escapeAddress(s: string): string {
 /**
  * Layout:
  * - فریم کیف بالا و فریم شیشه‌ای پایین، دقیقاً هم‌عرض و هم‌تراز
- * - فریم‌ها ۱۰٪ باریک‌تر از عرض پایه
+ * - هر دو ۱۰٪ باریک‌تر از عرض پایه
  * - بدون خط عمودی
  * - RANK رنگ متفاوت
  * - فریم کیف دوخطی (MY WALLET + آدرس)
- * - برای رندر روی سرور فقط از font-family="sans-serif" استفاده می‌کنیم تا توی لینوکس مربع نشه
  */
 function buildOverlaySVG(
   title: string | undefined,
   addressStr: string | undefined,
   statsIn: Stat[] | undefined,
-  logoHref: string = '/base_logo.svg', // فقط برای سازگاری امضاء
+  _logoHref: string = '/base_logo.svg', // فقط برای سازگاری امضاء
 ): string {
   const stats = Array.isArray(statsIn) ? statsIn : [];
   const maxRows = 6;
@@ -178,7 +177,8 @@ function buildOverlaySVG(
           fill="#93C5FD"
           font-size="15"
           font-weight="600"
-          font-family="sans-serif">
+          font-family="sans-serif"
+          letter-spacing="0.18em">
           ${label}
         </text>
         <text
@@ -220,6 +220,7 @@ function buildOverlaySVG(
             fill="#F9FAFB"
             font-size="15"
             font-weight="600"
+            letter-spacing="0.18em"
             font-family="sans-serif">
         MY WALLET
       </text>
@@ -382,7 +383,7 @@ function LiveOverlay({
           fill="#F9FAFB"
           style={{
             fontFamily:
-              "Space Grotesk,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
+              'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
             fontSize: 34,
             fontWeight: 800,
           }}
@@ -413,7 +414,7 @@ function LiveOverlay({
             fill="#F9FAFB"
             style={{
               fontFamily:
-                "Space Grotesk,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
+                'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
               fontSize: 15,
               fontWeight: 600,
               letterSpacing: '0.18em',
@@ -427,7 +428,7 @@ function LiveOverlay({
             fill="#38BDF8"
             style={{
               fontFamily:
-                "Space Grotesk,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
+                'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
               fontSize: 22,
               fontWeight: 700,
             }}
@@ -443,7 +444,7 @@ function LiveOverlay({
         const yValue = yLabel + 26;
         const rawLabel = (s?.label || '').toString();
         const label = rawLabel.toUpperCase();
-        the value = (s?.value || '').toString();
+        const value = (s?.value || '').toString();
         const isRank = rawLabel.trim().toLowerCase() === 'rank';
         const valueColor = isRank ? '#FACC15' : '#22D3EE';
 
@@ -455,7 +456,7 @@ function LiveOverlay({
               fill="#93C5FD"
               style={{
                 fontFamily:
-                  "Space Grotesk,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
+                  'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
                 fontSize: 15,
                 fontWeight: 600,
                 letterSpacing: '0.18em',
@@ -471,7 +472,7 @@ function LiveOverlay({
               strokeWidth={0.6}
               style={{
                 fontFamily:
-                  "Space Grotesk,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",
+                  'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
                 fontSize: 32,
                 fontWeight: 800,
                 paintOrder: 'stroke',
@@ -519,7 +520,9 @@ export default function CardPreviewMint({
         return;
       }
       try {
-        const r = await fetch(`/api/metrics?address=${effectiveAddress}`, { cache: 'no-store' });
+        const r = await fetch(`/api/metrics?address=${effectiveAddress}`, {
+          cache: 'no-store',
+        });
         if (!r.ok) throw new Error(`metrics ${r.status}`);
         const data: any = await r.json();
 
@@ -527,6 +530,7 @@ export default function CardPreviewMint({
 
         let overlay: Stat[] = [];
 
+        // ---- حالت ۱: ساختار /api/metrics → { summary, monthly } ----
         const monthlyA: any[] = Array.isArray(data.monthly)
           ? data.monthly
           : Array.isArray(data.metrics?.monthly)
@@ -534,11 +538,21 @@ export default function CardPreviewMint({
           : [];
 
         if (monthlyA.length > 0) {
-          const sBal = monthlyA.map((m) => Number(m.avg_balance_eth ?? m.balance_eth ?? 0));
-          const sTxs = monthlyA.map((m) => Number(m.native_txs ?? m.txs ?? 0));
-          const sUniq = monthlyA.map((m) => Number(m.uniq_contracts ?? m.uniq ?? 0));
-          const sDays = monthlyA.map((m) => Number(m.uniq_days ?? m.days ?? 0));
-          const sRank = monthlyA.map((m) => Number(m.ranks?.overall?.rank ?? m.rank_m ?? 0));
+          const sBal = monthlyA.map((m) =>
+            Number(m.avg_balance_eth ?? m.balance_eth ?? 0),
+          );
+          const sTxs = monthlyA.map((m) =>
+            Number(m.native_txs ?? m.txs ?? 0),
+          );
+          const sUniq = monthlyA.map((m) =>
+            Number(m.uniq_contracts ?? m.uniq ?? 0),
+          );
+          const sDays = monthlyA.map((m) =>
+            Number(m.uniq_days ?? m.days ?? 0),
+          );
+          const sRank = monthlyA.map((m) =>
+            Number(m.ranks?.overall?.rank ?? m.rank_m ?? 0),
+          );
 
           const activeMonths = monthlyA.filter(
             (m) =>
@@ -553,13 +567,15 @@ export default function CardPreviewMint({
             uniq: sum(sUniq),
             days: sum(sDays),
             months: activeMonths,
-            rank: sRank.filter((x) => x > 0).length ? Math.min(...sRank.filter((x) => x > 0)) : 0,
+            rank: sRank.filter((x) => x > 0).length
+              ? Math.min(...sRank.filter((x) => x > 0))
+              : 0,
           };
 
           overlay = [
             {
               label: 'Rank',
-              value: V.rank ? V.rank.toLocaleString() : '—',
+              value: V.rank ? V.rank.toLocaleString() : '—', // بدون #
             },
             {
               label: 'Active Months',
@@ -583,12 +599,14 @@ export default function CardPreviewMint({
             },
           ];
         } else {
+          // ---- حالت ۲: ساختار wallets_FULL → { wallet, rank, lifetime, months:{...} } ----
           const root: any = data.metrics || data;
           const lifetime = root.lifetime || {};
           const monthsObj = root.months || {};
           const monthsArr = Object.values(monthsObj) as any[];
 
-          const rank = root.rank ?? lifetime.rank ?? root.rank_lt ?? root.composite_rank_lt ?? 0;
+          const rank =
+            root.rank ?? lifetime.rank ?? root.rank_lt ?? root.composite_rank_lt ?? 0;
 
           const txSum =
             lifetime.tx_sum ??
@@ -598,7 +616,10 @@ export default function CardPreviewMint({
             lifetime.uniq_sum ??
             monthsArr.reduce((acc, m) => acc + Number(m.uniq || 0), 0);
 
-          const daysSum = monthsArr.reduce((acc, m) => acc + Number(m.days || 0), 0);
+          const daysSum = monthsArr.reduce(
+            (acc, m) => acc + Number(m.days || 0),
+            0,
+          );
 
           const activeMonths = monthsArr.filter(
             (m) =>
@@ -610,7 +631,8 @@ export default function CardPreviewMint({
           const balanceMean =
             lifetime.avg_balance_eth_mean ??
             (monthsArr.length
-              ? monthsArr.reduce((acc, m) => acc + Number(m.bal || 0), 0) / monthsArr.length
+              ? monthsArr.reduce((acc, m) => acc + Number(m.bal || 0), 0) /
+                monthsArr.length
               : 0);
 
           overlay = [
@@ -661,6 +683,7 @@ export default function CardPreviewMint({
     };
   }, [effectiveAddress]);
 
+  // اول متریک‌های خودمون، بعد اگر نبود، props.stats
   const statsToUse: Stat[] =
     metricsStats && metricsStats.length > 0
       ? metricsStats
@@ -668,6 +691,7 @@ export default function CardPreviewMint({
       ? stats
       : [];
 
+  // On-chain reads
   const { data: mintFeeWei } = useReadContract({
     address: CONTRACT,
     abi: bmImage721Abi as any,
@@ -682,6 +706,7 @@ export default function CardPreviewMint({
     query: { enabled: Boolean(CONTRACT && connected) },
   });
 
+  // Gate reads (optional)
   const { data: genFeeWei } = useReadContract({
     address: GATE || undefined,
     abi: gateAbi as any,
@@ -708,7 +733,12 @@ export default function CardPreviewMint({
   const [cardImg, setCardImg] = useState<string | null>(null);
   const [cardHash, setCardHash] = useState<string | null>(null);
   const [tokenUri, setTokenUri] = useState<string | null>(null);
-  const [busy, setBusy] = useState<{ gen?: boolean; compose?: boolean; mint?: boolean; paying?: boolean }>({});
+  const [busy, setBusy] = useState<{
+    gen?: boolean;
+    compose?: boolean;
+    mint?: boolean;
+    paying?: boolean;
+  }>({});
   const [error, setError] = useState<string | null>(null);
   const [payTx, setPayTx] = useState<string | null>(null);
   const [mintTx, setMintTx] = useState<string | null>(null);
@@ -765,6 +795,7 @@ export default function CardPreviewMint({
     a.remove();
   }
 
+  // --- Pay (optional) + Generate via /api/generate ---
   async function handleGenerate() {
     setError(null);
 
@@ -826,6 +857,7 @@ export default function CardPreviewMint({
     }
   }
 
+  // --- Compose + Mint در یک کلیک ---
   async function handleComposeAndMint() {
     setError(null);
 
@@ -838,6 +870,7 @@ export default function CardPreviewMint({
       return;
     }
 
+    // 1) Compose / store
     setBusy((b) => ({ ...b, compose: true }));
     let composedImg: string | null = null;
     let composedHash: string | null = null;
@@ -891,6 +924,7 @@ export default function CardPreviewMint({
     }
     setBusy((b) => ({ ...b, compose: false }));
 
+    // 2) Mint
     if (!composedImg || !composedTokenUri) {
       setError('Missing composed image or tokenURI');
       return;
@@ -901,6 +935,7 @@ export default function CardPreviewMint({
       const deadline = Math.floor(Date.now() / 1000) + 3600;
       const nonce = Number(nextNonce || 0);
 
+      // از هشِ تازه استفاده کن، اگر نبود از state قبلی
       let imageHash: string | null = composedHash || cardHash;
       if (!imageHash && composedImg.startsWith('data:')) {
         imageHash = keccak256(dataUrlBytes(composedImg));
