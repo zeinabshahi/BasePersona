@@ -120,7 +120,7 @@ const mean = (arr: number[]) => (arr.length ? sum(arr) / arr.length : 0);
 
 // font stack مشترک برای SVG و LiveOverlay
 const FONT_STACK =
-  "Space Grotesk,'DejaVu Sans',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif";
+  "'DejaVu Sans','Space Grotesk',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif";
 
 // ---------- Build SVG overlay ----------
 function escapeXml(s: string): string {
