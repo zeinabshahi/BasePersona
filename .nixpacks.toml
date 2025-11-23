@@ -1,0 +1,31 @@
+[variables]
+PORT = "3000"
+NODE_ENV = "production"
+
+[phases.setup]
+# ابزارهای اصلی
+nixPkgs = ["nodejs_20", "python3", "gcc", "gnumake"]
+
+# این‌جا فونت‌ها و خود fontconfig نصب می‌شن
+aptPkgs = [
+  "fontconfig",
+  "fonts-dejavu-core",
+  "fonts-dejavu-extra",
+  "fonts-liberation",
+  "fonts-noto-core"
+]
+
+[phases.install]
+# چون root-directory سرویس /ui هست، اینجا در context روت ریپو اجرا می‌شه،
+# برای همین working_directory می‌ذاریم "ui"
+cmds = ["npm ci"]
+working_directory = "ui"
+
+[phases.build]
+cmds = ["npm run build"]
+working_directory = "ui"
+
+[start]
+# همین استارت قبلی، فقط از داخل ui
+cmd = "npm run start"
+working_directory = "ui"
