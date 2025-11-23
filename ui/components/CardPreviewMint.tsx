@@ -25,13 +25,13 @@ type Props = {
   title?: string;
   subtitle?: string;
   stats?: Stat[];
-  badgeText?: string; // فعلاً استفاده نمی‌کنیم (قبلاً ALL-TIME بود)
+  badgeText?: string;
   placeholderSrc?: string;
   logoHref?: string;
 
   // Optional API inputs
-  address?: string; // falls back to connected wallet
-  traitsJson?: ImageTraits | null; // فقط برای /api/generate
+  address?: string;
+  traitsJson?: ImageTraits | null;
   persona?: any;
 };
 
@@ -106,9 +106,21 @@ function toNumberSafe(x: unknown, fallback = 0): number {
   return Number.isFinite(n) ? n : fallback;
 }
 
+// simple int formatter -> فقط ارقام لاتین با comma
+function fmtInt(x: unknown): string {
+  const n = Number(x ?? 0);
+  if (!Number.isFinite(n)) return '0';
+  const s = Math.round(n).toString();
+  return s.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+
 // small math helpers
 const sum = (arr: number[]) => arr.reduce((a, b) => a + b, 0);
 const mean = (arr: number[]) => (arr.length ? sum(arr) / arr.length : 0);
+
+// font stack مشترک برای SVG و LiveOverlay
+const FONT_STACK =
+  "Space Grotesk,'DejaVu Sans',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif";
 
 // ---------- Build SVG overlay ----------
 function escapeXml(s: string): string {
@@ -121,7 +133,6 @@ function escapeAddress(s: string): string {
 /**
  * Layout:
  * - فریم کیف بالا و فریم شیشه‌ای پایین، دقیقاً هم‌عرض و هم‌تراز
- * - فریم شیشه‌ای ۱۰٪ باریک‌تر از عرض پایه و هر دو از یک عرض استفاده می‌کنند
  * - بدون خط عمودی
  * - RANK رنگ متفاوت
  * - فریم کیف دوخطی (MY WALLET + آدرس)
@@ -177,7 +188,7 @@ function buildOverlaySVG(
           fill="#93C5FD"
           font-size="15"
           font-weight="600"
-          font-family="DejaVu Sans,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"
+          font-family="${FONT_STACK}"
           letter-spacing="0.18em">
           ${label}
         </text>
@@ -190,7 +201,7 @@ function buildOverlaySVG(
           paint-order="stroke"
           font-size="32"
           font-weight="800"
-          font-family="DejaVu Sans,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+          font-family="${FONT_STACK}">
           ${value}
         </text>
       </g>`;
@@ -204,7 +215,7 @@ function buildOverlaySVG(
             fill="#F9FAFB"
             font-size="34"
             font-weight="800"
-            font-family="DejaVu Sans,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+            font-family="${FONT_STACK}">
         ${titleSafe}
       </text>
     </g>`
@@ -221,14 +232,14 @@ function buildOverlaySVG(
             font-size="15"
             font-weight="600"
             letter-spacing="0.18em"
-            font-family="DejaVu Sans,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+            font-family="${FONT_STACK}">
         MY WALLET
       </text>
       <text x="${padLeft + 22}" y="124"
             fill="#38BDF8"
             font-size="22"
             font-weight="700"
-            font-family="DejaVu Sans,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif">
+            font-family="${FONT_STACK}">
         ${addrSafe}
       </text>
     </g>`
@@ -268,7 +279,7 @@ function buildOverlaySVG(
           fill="url(#baseCubeHighlight)" fill-opacity="0.55" />
   </g>
 
-  <!-- پنل شیشه‌ای برای استت‌ها (۱۰٪ باریک‌تر و هم‌عرض فریم کیف) -->
+  <!-- پنل شیشه‌ای برای استت‌ها -->
   <rect x="${sharedX}" y="${panelY}" width="${sharedWidth}" height="${panelH}"
         rx="24" ry="24"
         fill="url(#panelBg)"
@@ -317,9 +328,6 @@ function LiveOverlay({
   const panelY = statsTop - 90;
   const panelH = rowGap * n + 110;
 
-  const fontFamilyStr =
-    "DejaVu Sans, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
-
   return (
     <svg viewBox="0 0 1024 1024" preserveAspectRatio="none" width="100%" height="100%">
       <defs>
@@ -364,7 +372,7 @@ function LiveOverlay({
         />
       </g>
 
-      {/* پنل شیشه‌ای پایین، ۱۰٪ باریک‌تر و هم‌عرض فریم کیف */}
+      {/* پنل شیشه‌ای پایین */}
       <rect
         x={sharedX}
         y={panelY}
@@ -385,7 +393,7 @@ function LiveOverlay({
           y={60}
           fill="#F9FAFB"
           style={{
-            fontFamily: fontFamilyStr,
+            fontFamily: FONT_STACK,
             fontSize: 34,
             fontWeight: 800,
           }}
@@ -394,7 +402,7 @@ function LiveOverlay({
         </text>
       )}
 
-      {/* فریم کیف دوخطی و هم‌عرض با پایین */}
+      {/* فریم کیف بالا */}
       {addressStr && (
         <g opacity={0.96}>
           <rect
@@ -415,7 +423,7 @@ function LiveOverlay({
             y={98}
             fill="#F9FAFB"
             style={{
-              fontFamily: fontFamilyStr,
+              fontFamily: FONT_STACK,
               fontSize: 15,
               fontWeight: 600,
               letterSpacing: '0.18em',
@@ -428,7 +436,7 @@ function LiveOverlay({
             y={124}
             fill="#38BDF8"
             style={{
-              fontFamily: fontFamilyStr,
+              fontFamily: FONT_STACK,
               fontSize: 22,
               fontWeight: 700,
             }}
@@ -438,7 +446,7 @@ function LiveOverlay({
         </g>
       )}
 
-      {/* ردیف‌های استت با فاصله بیشتر و Rank رنگ متفاوت */}
+      {/* ردیف‌های استت */}
       {rowsArr.map((s, i) => {
         const yLabel = statsTop + rowGap * i;
         const yValue = yLabel + 26;
@@ -455,7 +463,7 @@ function LiveOverlay({
               y={yLabel}
               fill="#93C5FD"
               style={{
-                fontFamily: fontFamilyStr,
+                fontFamily: FONT_STACK,
                 fontSize: 15,
                 fontWeight: 600,
                 letterSpacing: '0.18em',
@@ -470,7 +478,7 @@ function LiveOverlay({
               stroke="#020617"
               strokeWidth={0.6}
               style={{
-                fontFamily: fontFamilyStr,
+                fontFamily: FONT_STACK,
                 fontSize: 32,
                 fontWeight: 800,
                 paintOrder: 'stroke',
@@ -559,23 +567,23 @@ export default function CardPreviewMint({
           overlay = [
             {
               label: 'Rank',
-              value: V.rank ? V.rank.toLocaleString() : '—', // بدون #
+              value: V.rank ? fmtInt(V.rank) : '—',
             },
             {
               label: 'Active Months',
-              value: String(V.months),
+              value: fmtInt(V.months),
             },
             {
               label: 'Active Days',
-              value: String(Math.round(V.days)),
+              value: fmtInt(V.days),
             },
             {
               label: 'Transactions',
-              value: Math.round(V.txs).toLocaleString(),
+              value: fmtInt(V.txs),
             },
             {
               label: 'Unique Contracts',
-              value: Math.round(V.uniq).toLocaleString(),
+              value: fmtInt(V.uniq),
             },
             {
               label: 'Average Balance',
@@ -617,23 +625,23 @@ export default function CardPreviewMint({
           overlay = [
             {
               label: 'Rank',
-              value: rank ? Number(rank).toLocaleString() : '—',
+              value: rank ? fmtInt(rank) : '—',
             },
             {
               label: 'Active Months',
-              value: String(activeMonths),
+              value: fmtInt(activeMonths),
             },
             {
               label: 'Active Days',
-              value: String(Math.round(daysSum)),
+              value: fmtInt(daysSum),
             },
             {
               label: 'Transactions',
-              value: Math.round(txSum).toLocaleString(),
+              value: fmtInt(txSum),
             },
             {
               label: 'Unique Contracts',
-              value: Math.round(uniqSum).toLocaleString(),
+              value: fmtInt(uniqSum),
             },
             {
               label: 'Average Balance',
@@ -909,7 +917,6 @@ export default function CardPreviewMint({
       const deadline = Math.floor(Date.now() / 1000) + 3600;
       const nonce = Number(nextNonce || 0);
 
-      // از هشِ تازه استفاده کن، اگر نبود از state قبلی
       let imageHash: string | null = composedHash || cardHash;
       if (!imageHash && composedImg.startsWith('data:')) {
         imageHash = keccak256(dataUrlBytes(composedImg));
