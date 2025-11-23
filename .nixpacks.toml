@@ -1,31 +1,44 @@
+# ui/nixpacks.toml
+
 [variables]
 PORT = "3000"
 NODE_ENV = "production"
 
 [phases.setup]
-# ابزارهای اصلی
+# پکیج‌های نیکس
 nixPkgs = ["nodejs_20", "python3", "gcc", "gnumake"]
 
-# این‌جا فونت‌ها و خود fontconfig نصب می‌شن
+# پکیج‌های apt:
+# - libatomic1 برای node
+# - fontconfig + چند فونت دیفالت که اگر Space Grotesk پیدا نشد مربع نشه
 aptPkgs = [
+  "libatomic1",
   "fontconfig",
   "fonts-dejavu-core",
-  "fonts-dejavu-extra",
   "fonts-liberation",
   "fonts-noto-core"
 ]
 
 [phases.install]
-# چون root-directory سرویس /ui هست، اینجا در context روت ریپو اجرا می‌شه،
-# برای همین working_directory می‌ذاریم "ui"
 cmds = ["npm ci"]
 working_directory = "ui"
 
 [phases.build]
-cmds = ["npm run build"]
+cmds = [
+  # ۱) فولدر فونت‌های Space Grotesk روی سیستم
+  "mkdir -p /usr/local/share/fonts/opentype/spacegrotesk",
+
+  # ۲) کپی همه‌ی فونت‌های OTF از public به فولدر سیستم
+  "cp public/fonts/space-grotesk/*.otf /usr/local/share/fonts/opentype/spacegrotesk/ || echo 'no SpaceGrotesk .otf fonts, skipping copy'",
+
+  # ۳) رفرش cache فونت‌ها تا fontconfig / sharp ببیننشون
+  "fc-cache -f -v || echo 'fc-cache not available, skipping'",
+
+  # ۴) بیلد نکس‌جی‌اس
+  "npm run build"
+]
 working_directory = "ui"
 
 [start]
-# همین استارت قبلی، فقط از داخل ui
 cmd = "npm run start"
 working_directory = "ui"

@@ -5,15 +5,18 @@ PORT = "3000"
 NODE_ENV = "production"
 
 [phases.setup]
-# همونی که داشتی
+# پکیج‌های نیکس
 nixPkgs = ["nodejs_20", "python3", "gcc", "gnumake"]
 
-# پکیج‌هایی که لازم داریم:
-# - libatomic1: برای نود
-# - fontconfig: برای مدیریت فونت‌ها + fc-cache
+# پکیج‌های apt:
+# - libatomic1 برای node
+# - fontconfig + چند فونت دیفالت که اگر Space Grotesk پیدا نشد مربع نشه
 aptPkgs = [
   "libatomic1",
-  "fontconfig"
+  "fontconfig",
+  "fonts-dejavu-core",
+  "fonts-liberation",
+  "fonts-noto-core"
 ]
 
 [phases.install]
@@ -21,21 +24,17 @@ cmds = ["npm ci"]
 working_directory = "ui"
 
 [phases.build]
-# قبل از build فونت Space Grotesk رو روی سیستم نصب می‌کنیم و cache رو آپدیت می‌کنیم
 cmds = [
-  # فولدر فونت‌ها در سیستم
-  "mkdir -p /usr/local/share/fonts/truetype/spacegrotesk",
+  # ۱) فولدر فونت‌های Space Grotesk روی سیستم
+  "mkdir -p /usr/local/share/fonts/opentype/spacegrotesk",
 
-  # اگر فونت ttf بود
-  "cp public/fonts/space-grotesk/*.ttf /usr/local/share/fonts/truetype/spacegrotesk/ 2>/dev/null || echo 'no ttf SpaceGrotesk fonts, skipping ttf copy'",
+  # ۲) کپی همه‌ی فونت‌های OTF از public به فولدر سیستم
+  "cp public/fonts/space-grotesk/*.otf /usr/local/share/fonts/opentype/spacegrotesk/ || echo 'no SpaceGrotesk .otf fonts, skipping copy'",
 
-  # اگر فونت otf بود
-  "cp public/fonts/space-grotesk/*.otf /usr/local/share/fonts/truetype/spacegrotesk/ 2>/dev/null || echo 'no otf SpaceGrotesk fonts, skipping otf copy'",
-
-  # ریفرش cache فونت‌ها
+  # ۳) رفرش cache فونت‌ها تا fontconfig / sharp ببیننشون
   "fc-cache -f -v || echo 'fc-cache not available, skipping'",
 
-  # بعدش build نکس‌جی‌اس
+  # ۴) بیلد نکس‌جی‌اس
   "npm run build"
 ]
 working_directory = "ui"
